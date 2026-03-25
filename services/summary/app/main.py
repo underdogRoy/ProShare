@@ -4,25 +4,25 @@ import os
 import re
 from collections import Counter
 from datetime import datetime
-
-import redis
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint, create_engine
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, Session, declarative_base, mapped_column, sessionmaker
 
+from services.shared.app.cache import build_cache
+from services.shared.app.database import build_engine
 from services.shared.app.security import decode_token
 
 DATABASE_URL = os.getenv("SUMMARY_DB_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/proshare_summary")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
-engine = create_engine(DATABASE_URL)
+engine = build_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 auth = HTTPBearer()
-cache = redis.Redis.from_url(REDIS_URL, decode_responses=True)
+cache = build_cache(REDIS_URL)
 
 
 class Summary(Base):

@@ -39,6 +39,49 @@ Endpoints:
 - Engagement: `http://localhost:8003`
 - Summary: `http://localhost:8004`
 
+## Quick start (Windows, no Docker)
+This repository now includes a local development mode for Windows:
+
+- Service databases run on local `SQLite` files under `.local-data/`
+- Summary cache falls back to in-memory storage, so local dev does not require Redis
+- You can start the whole stack with PowerShell scripts
+
+Requirements:
+- Python 3.10+
+- Node.js 18+
+- PowerShell
+
+From the repo root:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\setup-local.ps1
+.\scripts\start-local.ps1
+```
+
+Endpoints in local mode:
+- Gateway: `http://127.0.0.1:8000`
+- Identity: `http://127.0.0.1:8001`
+- Content: `http://127.0.0.1:8002`
+- Engagement: `http://127.0.0.1:8003`
+- Summary: `http://127.0.0.1:8004`
+- Frontend: `http://127.0.0.1:5173`
+
+Helpful commands:
+
+```powershell
+# Start backend services only
+.\scripts\start-local.ps1 -NoFrontend
+
+# Stop everything started by the local script
+.\scripts\stop-local.ps1
+```
+
+Notes:
+- Local SQLite files are created automatically in `.local-data/`
+- Summary cache is in-memory during local mode, so restarting the summary service clears cached summaries
+- The Docker workflow still uses PostgreSQL + Redis as before
+
 ## Frontend
 ```bash
 cd frontend

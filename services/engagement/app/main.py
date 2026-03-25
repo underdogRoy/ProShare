@@ -4,15 +4,16 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, create_engine, func
+from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, Session, declarative_base, mapped_column, sessionmaker
 
+from services.shared.app.database import build_engine
 from services.shared.app.security import decode_token
 
 DATABASE_URL = os.getenv("ENGAGEMENT_DB_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/proshare_engagement")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
-engine = create_engine(DATABASE_URL)
+engine = build_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 auth = HTTPBearer()

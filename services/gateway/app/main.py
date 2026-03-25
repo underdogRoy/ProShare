@@ -2,13 +2,27 @@ import os
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 IDENTITY = os.getenv("IDENTITY_URL", "http://localhost:8001")
 CONTENT = os.getenv("CONTENT_URL", "http://localhost:8002")
 ENGAGEMENT = os.getenv("ENGAGEMENT_URL", "http://localhost:8003")
 SUMMARY = os.getenv("SUMMARY_URL", "http://localhost:8004")
+CORS_ALLOW_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(",")
+    if origin.strip()
+]
 
 app = FastAPI(title="ProShare API Gateway")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ALLOW_ORIGINS,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def request_json(method: str, url: str, request: Request | None = None, json_body: dict | None = None):
@@ -44,6 +58,16 @@ async def users_proxy(path: str, request: Request):
     return await request_json(request.method, f"{IDENTITY}/users/{path}", request=request)
 
 
+@app.api_route('/articles', methods=['POST'])
+async def create_article(request: Request):
+    return await request_json(request.method, f"{CONTENT}/articles", request=request)
+
+
+@app.api_route('/articles/mine', methods=['GET'])
+async def my_articles(request: Request):
+    return await request_json(request.method, f"{CONTENT}/articles/mine", request=request)
+
+
 @app.api_route('/articles/{article_id}/summary', methods=['POST'])
 async def summary_generate(article_id: int, request: Request):
     regenerate = request.query_params.get("regenerate", "false").lower() == "true"
@@ -72,6 +96,16 @@ async def summary_feedback(article_id: int, request: Request):
 @app.api_route('/articles/{article_id}/{action}', methods=['POST'])
 async def engagement_actions(article_id: int, action: str, request: Request):
     return await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/{action}", request=request)
+
+
+@app.api_route('/articles/{article_id}/comments', methods=['GET', 'POST'])
+async def article_comments(article_id: int, request: Request):
+    return await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/comments", request=request)
+
+
+@app.api_route('/articles/{article_id}/stats', methods=['GET'])
+async def article_stats(article_id: int, request: Request):
+    return await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/stats", request=request)
 
 
 @app.api_route('/articles/{path:path}', methods=['GET', 'POST', 'PUT'])

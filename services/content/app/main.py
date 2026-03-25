@@ -4,15 +4,16 @@ from datetime import datetime
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine, desc, func
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, desc, func
 from sqlalchemy.orm import Mapped, Session, declarative_base, mapped_column, sessionmaker
 
+from services.shared.app.database import build_engine
 from services.shared.app.security import decode_token
 
 DATABASE_URL = os.getenv("CONTENT_DB_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/proshare_content")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
 
-engine = create_engine(DATABASE_URL)
+engine = build_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
 auth = HTTPBearer()
@@ -90,6 +91,16 @@ def update_article(article_id: int, payload: ArticlePatch, user_id: int = Depend
     db.commit()
     db.refresh(article)
     return article
+
+
+@app.get("/articles/mine")
+def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    return (
+        db.query(Article)
+        .filter(Article.author_id == user_id)
+        .order_by(desc(Article.updated_at))
+        .all()
+    )
 
 
 @app.get("/articles/{article_id}")
