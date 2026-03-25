@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [frontend, backend, ai]
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        if: matrix.module == 'frontend'
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        if: matrix.module != 'frontend'
+        with:
+          python-version: '3.12'
+      - run: npm ci && npm run lint && npm test -- --ci
+        if: matrix.module == 'frontend'
+      - run: pip install -r requirements.txt && pytest --cov=app --cov-report=term
+        if: matrix.module != 'frontend'
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t proshare-frontend ./frontend
+      - run: docker build -t proshare-backend ./backend
+      - run: docker build -t proshare-ai ./ai
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cd frontend && npm audit --audit-level=high || true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt -r ai/requirements.txt && pip check
