@@ -4,6 +4,7 @@ Production-oriented modular scaffold for a professional knowledge-sharing
 platform with AI summaries.
 
 ## Modules
+- `infra/docs/microservices.md`: service decomposition plan from modular monolith to microservices
 - `frontend/`: Next.js app (UI, hooks, pages, tests)
 - `backend/`: FastAPI REST API, SQLAlchemy models, migration SQL, tests
 - `ai/`: AI summarization FastAPI + Celery worker, chunking/cache pipeline
