@@ -364,6 +364,12 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
   gap: 1rem;
+  align-items: start;
+}
+
+.articleMain {
+  display: grid;
+  gap: 1rem;
 }
 
 .articleDetail,
@@ -375,7 +381,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .articleDetailHeader { justify-content: space-between; }
 .metaCluster { gap: 0.6rem; }
 .articleBody p { font-size: 1.03rem; }
-.articleSidebar { display: grid; gap: 1rem; }
+.articleSidebar { display: grid; gap: 1rem; position: sticky; top: 1rem; }
 .stackedActions { flex-direction: column; align-items: stretch; }
 .stackedActions > * { width: 100%; }
 
@@ -394,7 +400,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   gap: 0.45rem;
 }
 
-.commentsPanel { grid-column: 1 / -1; }
+.commentsPanel { }
 .commentComposer input { flex: 1 1 320px; margin: 0; }
 
 .commentItem {
@@ -455,6 +461,8 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .topBar {
     grid-template-columns: 1fr;
   }
+
+  .articleSidebar { position: static; }
 
   .topBar { justify-items: stretch; }
   .headerActions,

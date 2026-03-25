@@ -9,11 +9,21 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./infra/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports:
       - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   identity:
     build:
@@ -22,7 +32,9 @@ services:
     environment:
       IDENTITY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_identity
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ['8001:8000']
 
   content:
@@ -32,7 +44,9 @@ services:
     environment:
       CONTENT_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_content
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ['8002:8000']
 
   engagement:
@@ -42,7 +56,9 @@ services:
     environment:
       ENGAGEMENT_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_engagement
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports: ['8003:8000']
 
   summary:
@@ -53,7 +69,11 @@ services:
       SUMMARY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_summary
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
-    depends_on: [postgres, redis]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports: ['8004:8000']
 
   gateway:

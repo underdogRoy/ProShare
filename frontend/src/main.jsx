@@ -538,28 +538,28 @@ function App() {
 
         {!isBootstrapping && page === 'article' && selectedArticle && (
           <section className="articleLayout">
-            <article className="pageSurface articleDetail">
-              <div className="articleDetailHeader">
-                <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
-                {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
-              </div>
-              <div className="metaCluster">
-                <StatusBadge status={selectedArticle.status} />
-                <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
-                <span className="metaText">{readingTime(selectedArticle.content)}</span>
-                <span className="metaText">Author #{selectedArticle.author_id}</span>
-              </div>
-              <h2>{selectedArticle.title}</h2>
-              <div className="tagRow">
-                {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
-                  <span key={tag} className="tagChip">{tag}</span>
-                ))}
-              </div>
-              <div className="articleBody">
-                {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-              </div>
-            </article>
-            <aside className="articleSidebar">
+            <div className="articleMain">
+              <article className="pageSurface articleDetail">
+                <div className="articleDetailHeader">
+                  <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
+                  {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
+                </div>
+                <div className="metaCluster">
+                  <StatusBadge status={selectedArticle.status} />
+                  <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
+                  <span className="metaText">{readingTime(selectedArticle.content)}</span>
+                  <span className="metaText">Author #{selectedArticle.author_id}</span>
+                </div>
+                <h2>{selectedArticle.title}</h2>
+                <div className="tagRow">
+                  {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
+                    <span key={tag} className="tagChip">{tag}</span>
+                  ))}
+                </div>
+                <div className="articleBody">
+                  {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+                </div>
+              </article>
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">Engagement</p>
                 <div className="statGrid slimStats">
@@ -572,6 +572,26 @@ function App() {
                   <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
                 </div>
               </section>
+              <section className="pageSurface commentsPanel">
+                <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
+                <form className="commentComposer" onSubmit={handleComment}>
+                  <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
+                  <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
+                </form>
+                {comments.length ? (
+                  <div className="commentList">
+                    {comments.map((item) => (
+                      <article key={item.id} className="commentItem">
+                        <strong>User #{item.user_id}</strong>
+                        <span className="metaText">{formatDate(item.created_at)}</span>
+                        <p>{item.content}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
+              </section>
+            </div>
+            <aside className="articleSidebar">
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">AI Summary</p>
                 <h3>Summarize this article</h3>
@@ -594,24 +614,6 @@ function App() {
                 )}
               </section>
             </aside>
-            <section className="pageSurface commentsPanel">
-              <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
-              <form className="commentComposer" onSubmit={handleComment}>
-                <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
-                <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
-              </form>
-              {comments.length ? (
-                <div className="commentList">
-                  {comments.map((item) => (
-                    <article key={item.id} className="commentItem">
-                      <strong>User #{item.user_id}</strong>
-                      <span className="metaText">{formatDate(item.created_at)}</span>
-                      <p>{item.content}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
-            </section>
           </section>
         )}
       </main>
