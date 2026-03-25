@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+node_modules/
+dist/
+proshare.db
+.local-data/
+.local-run/
+.DS_Store
