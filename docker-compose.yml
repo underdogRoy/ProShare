@@ -1,0 +1,72 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '6379:6379'
+
+  identity:
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    environment:
+      IDENTITY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_identity
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on: [postgres]
+    ports: ['8001:8000']
+
+  content:
+    build:
+      context: .
+      dockerfile: services/content/Dockerfile
+    environment:
+      CONTENT_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_content
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on: [postgres]
+    ports: ['8002:8000']
+
+  engagement:
+    build:
+      context: .
+      dockerfile: services/engagement/Dockerfile
+    environment:
+      ENGAGEMENT_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_engagement
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on: [postgres]
+    ports: ['8003:8000']
+
+  summary:
+    build:
+      context: .
+      dockerfile: services/summary/Dockerfile
+    environment:
+      SUMMARY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_summary
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on: [postgres, redis]
+    ports: ['8004:8000']
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    environment:
+      IDENTITY_URL: http://identity:8000
+      CONTENT_URL: http://content:8000
+      ENGAGEMENT_URL: http://engagement:8000
+      SUMMARY_URL: http://summary:8000
+    depends_on: [identity, content, engagement, summary]
+    ports: ['8000:8000']
+
+volumes:
+  pgdata:
