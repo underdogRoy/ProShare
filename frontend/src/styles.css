@@ -354,6 +354,40 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   gap: 1rem;
 }
 
+.richEditorLabel {
+  font-weight: 600;
+  color: #314255;
+  font-size: 1rem;
+  display: block;
+  margin-bottom: 0.45rem;
+}
+
+.richEditorWrapper .ql-toolbar.ql-snow {
+  border-radius: 18px 18px 0 0;
+  border-color: rgba(31, 53, 81, 0.14);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.richEditorWrapper .ql-container.ql-snow {
+  border-radius: 0 0 18px 18px;
+  border-color: rgba(31, 53, 81, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+  min-height: 320px;
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+.richEditorWrapper .ql-editor {
+  min-height: 320px;
+  line-height: 1.7;
+  color: #1b2432;
+}
+
+.richEditorWrapper .ql-editor.ql-blank::before {
+  color: #9aa3ae;
+  font-style: normal;
+}
+
 .splitFields { align-items: end; }
 .splitFields > label { flex: 1 1 0; }
 
@@ -379,6 +413,12 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 }
 
 .articleDetailHeader { justify-content: space-between; }
+.articleDetail h2 {
+  font-family: "Segoe UI Variable", "Aptos", "Trebuchet MS", sans-serif;
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  font-weight: 700;
+  line-height: 1.25;
+}
 .metaCluster { gap: 0.6rem; }
 .articleBody p { font-size: 1.03rem; }
 .articleSidebar { display: grid; gap: 1rem; position: sticky; top: 1rem; }

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 import './styles.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -37,11 +39,13 @@ function formatDate(value) {
 
 function excerpt(text, length = 180) {
   if (!text) return ''
-  return text.length > length ? `${text.slice(0, length).trim()}...` : text
+  const plain = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return plain.length > length ? `${plain.slice(0, length).trim()}...` : plain
 }
 
 function readingTime(text) {
-  const words = text.trim().split(/\s+/).filter(Boolean).length
+  const plain = text.replace(/<[^>]*>/g, ' ')
+  const words = plain.trim().split(/\s+/).filter(Boolean).length
   return `${Math.max(1, Math.ceil(words / 180))} min read`
 }
 
@@ -514,7 +518,24 @@ function App() {
                 <label><span>Tags</span><input value={editor.tags} onChange={(event) => setEditor({ ...editor, tags: event.target.value })} placeholder="leadership, backend, career" /></label>
                 <label><span>Status</span><select value={editor.status} onChange={(event) => setEditor({ ...editor, status: event.target.value })}><option value="published">Published</option><option value="draft">Draft</option></select></label>
               </div>
-              <label><span>Content</span><textarea rows={18} value={editor.content} onChange={(event) => setEditor({ ...editor, content: event.target.value })} placeholder="Write the article body here..." /></label>
+              <div className="richEditorWrapper">
+                <span className="richEditorLabel">Content</span>
+                <ReactQuill
+                  theme="snow"
+                  value={editor.content}
+                  onChange={(value) => setEditor({ ...editor, content: value })}
+                  placeholder="Write the article body here..."
+                  modules={{
+                    toolbar: [
+                      [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ color: [] }, { background: [] }],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
               <div className="editorActions">
                 <button type="submit" className="primaryButton" disabled={isBusy}>
                   {isBusy ? 'Saving...' : editorMode === 'create' ? editor.status === 'published' ? 'Publish Article' : 'Save Draft' : 'Save Changes'}
@@ -548,7 +569,6 @@ function App() {
                   <StatusBadge status={selectedArticle.status} />
                   <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
                   <span className="metaText">{readingTime(selectedArticle.content)}</span>
-                  <span className="metaText">Author #{selectedArticle.author_id}</span>
                 </div>
                 <h2>{selectedArticle.title}</h2>
                 <div className="tagRow">
@@ -556,9 +576,7 @@ function App() {
                     <span key={tag} className="tagChip">{tag}</span>
                   ))}
                 </div>
-                <div className="articleBody">
-                  {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-                </div>
+                <div className="articleBody ql-snow"><div className="ql-editor" dangerouslySetInnerHTML={{ __html: selectedArticle.content }} /></div>
               </article>
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">Engagement</p>
