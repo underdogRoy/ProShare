@@ -15,7 +15,7 @@ async function api(path, method = 'GET', token = '', body) {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+body: body ? JSON.stringify(body) : undefined,
   })
   const text = await res.text()
   let data = {}
@@ -51,6 +51,20 @@ function readingTime(text) {
 
 function normalizeEditor(article) {
   return { id: article.id ?? null, title: article.title ?? '', content: article.content ?? '', tags: article.tags ?? '', status: article.status ?? 'draft' }
+}
+
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0)
+  useEffect(() => {
+    function update() {
+      const el = document.documentElement
+      const total = el.scrollHeight - el.clientHeight
+      setProgress(total > 0 ? (el.scrollTop / total) * 100 : 0)
+    }
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
+  return <div className="readingProgress" style={{ width: `${progress}%` }} />
 }
 
 function StatusBadge({ status }) {
@@ -545,19 +559,17 @@ function App() {
             </form>
             <aside className="pageSurface writingGuide">
               <p className="eyebrow">Editor Notes</p>
-              <h3>Use this space for writing, not browsing</h3>
-              <p>This page is intentionally separate from the reader view so creating content feels focused instead of crowded.</p>
               <div className="statGrid slimStats">
-                <div className="statCard"><strong>{editor.title.trim() ? editor.title.trim().split(/\s+/).length : 0}</strong><span>Title Words</span></div>
-                <div className="statCard"><strong>{editor.content.trim() ? editor.content.trim().split(/\s+/).length : 0}</strong><span>Body Words</span></div>
+                <div className="statCard"><strong>{editor.content.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length}</strong><span>Word Count</span></div>
                 <div className="statCard"><strong>{readingTime(editor.content)}</strong><span>Estimated Read</span></div>
               </div>
-              <p className="guideHint">Tip: save as draft if the structure is still changing, then publish once the article is ready for the public feed.</p>
             </aside>
           </section>
         )}
 
         {!isBootstrapping && page === 'article' && selectedArticle && (
+          <>
+          <ReadingProgress />
           <section className="articleLayout">
             <div className="articleMain">
               <article className="pageSurface articleDetail">
@@ -633,6 +645,7 @@ function App() {
               </section>
             </aside>
           </section>
+          </>
         )}
       </main>
     </div>
