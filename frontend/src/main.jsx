@@ -6,7 +6,7 @@ import './styles.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const EMPTY_EDITOR = { id: null, title: '', content: '', tags: '', status: 'published' }
-const EMPTY_CREDENTIALS = { email: '', username: '', password: '' }
+const EMPTY_CREDENTIALS = { email: '', username: '', password: '', bio: '', expertise_tags: '' }
 
 async function api(path, method = 'GET', token = '', body) {
   const res = await fetch(`${API}${path}`, {
@@ -133,6 +133,7 @@ function App() {
   const [mineArticles, setMineArticles] = useState([])
   const [mineFilter, setMineFilter] = useState('all')
   const [selectedArticle, setSelectedArticle] = useState(null)
+  const [articleAuthor, setArticleAuthor] = useState(null)
   const [articleReturnTo, setArticleReturnTo] = useState('explore')
   const [articleStats, setArticleStats] = useState(null)
   const [comments, setComments] = useState([])
@@ -141,6 +142,7 @@ function App() {
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [editor, setEditor] = useState(EMPTY_EDITOR)
   const [editorMode, setEditorMode] = useState('create')
+  const [profileDraft, setProfileDraft] = useState({ bio: '', expertise_tags: '', links: '', avatar_url: '' })
 
   const loggedIn = Boolean(token)
   const publishedCount = mineArticles.filter((article) => article.status === 'published').length
@@ -210,6 +212,12 @@ function App() {
     setSummary(null)
     setFeedbackMessage('')
     setArticleReturnTo(returnTo)
+    try {
+      const author = await api(`/users/${article.author_id}`, 'GET', token)
+      setArticleAuthor(author)
+    } catch {
+      setArticleAuthor(null)
+    }
     setPage('article')
   }
 
@@ -223,6 +231,32 @@ function App() {
     setEditor(normalizeEditor(article))
     setEditorMode('edit')
     setPage('editor')
+  }
+
+  function openProfile() {
+    setProfileDraft({
+      bio: currentUser?.bio || '',
+      expertise_tags: currentUser?.expertise_tags || '',
+      links: currentUser?.links || '',
+      avatar_url: currentUser?.avatar_url || '',
+    })
+    setPage('profile')
+  }
+
+  async function submitProfile(event) {
+    event.preventDefault()
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      await api('/users/me', 'PUT', token, profileDraft)
+      const updated = await api('/users/me', 'GET', token)
+      setCurrentUser(updated)
+      setNotice({ type: 'success', text: 'Profile updated.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   function logout() {
@@ -257,7 +291,7 @@ function App() {
     try {
       const body = authMode === 'login'
         ? { email: credentials.email, password: credentials.password }
-        : { email: credentials.email, username: credentials.username, password: credentials.password }
+        : { email: credentials.email, username: credentials.username, password: credentials.password, bio: credentials.bio, expertise_tags: credentials.expertise_tags }
       const result = await api(authMode === 'login' ? '/auth/login' : '/auth/register', 'POST', '', body)
       setToken(result.access_token)
       setCredentials(EMPTY_CREDENTIALS)
@@ -425,7 +459,11 @@ function App() {
           <form className="authForm" onSubmit={submitAuth}>
             <label><span>Email</span><input value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="you@example.com" /></label>
             {authMode === 'register' && (
-              <label><span>Username</span><input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Choose a public handle" /></label>
+              <>
+                <label><span>Username</span><input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Choose a public handle" /></label>
+                <label><span>Bio <span className="fieldOptional">(optional)</span></span><textarea rows={3} value={credentials.bio} onChange={(event) => setCredentials({ ...credentials, bio: event.target.value })} placeholder="A short introduction about yourself" /></label>
+                <label><span>Expertise <span className="fieldOptional">(optional)</span></span><input value={credentials.expertise_tags} onChange={(event) => setCredentials({ ...credentials, expertise_tags: event.target.value })} placeholder="e.g. backend, machine learning, design" /></label>
+              </>
             )}
             <label><span>Password</span><input type="password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="At least 8 characters" /></label>
             <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Please wait...' : authMode === 'login' ? 'Sign In' : 'Create Account'}</button>
@@ -448,6 +486,7 @@ function App() {
           <button type="button" className={`navButton ${page === 'explore' ? 'active' : ''}`} onClick={() => setPage('explore')}>Explore</button>
           <button type="button" className={`navButton ${page === 'editor' ? 'active' : ''}`} onClick={startNewArticle}>Write</button>
           <button type="button" className={`navButton ${page === 'mine' ? 'active' : ''}`} onClick={() => { setPage('mine'); refreshMine() }}>My Articles</button>
+          <button type="button" className={`navButton ${page === 'profile' ? 'active' : ''}`} onClick={openProfile}>Profile</button>
         </nav>
         <div className="headerActions">
           <div className="userSummary"><strong>{currentUser?.username || 'Writer'}</strong><span>{currentUser?.email || ''}</span></div>
@@ -568,6 +607,54 @@ function App() {
           </section>
         )}
 
+        {!isBootstrapping && page === 'profile' && (
+          <section className="editorLayout">
+            <form className="pageSurface editorPanel" onSubmit={submitProfile}>
+              <div className="panelHeader">
+                <div>
+                  <p className="eyebrow">Your Identity</p>
+                  <h2>Edit Profile</h2>
+                </div>
+              </div>
+              <div className="profileAvatarRow">
+                {profileDraft.avatar_url
+                  ? <img src={profileDraft.avatar_url} alt="avatar" className="profileAvatarPreview" onError={(e) => { e.target.style.display = 'none' }} />
+                  : <div className="authorAvatar profileAvatarPreview">{currentUser?.username?.slice(0, 2).toUpperCase()}</div>
+                }
+                <label style={{ flex: 1 }}><span>Profile Picture URL</span><input value={profileDraft.avatar_url} onChange={(e) => setProfileDraft({ ...profileDraft, avatar_url: e.target.value })} placeholder="https://example.com/photo.jpg" /></label>
+              </div>
+              <label><span>Bio</span><textarea rows={4} value={profileDraft.bio} onChange={(e) => setProfileDraft({ ...profileDraft, bio: e.target.value })} placeholder="Tell the community about yourself" /></label>
+              <label><span>Expertise</span><input value={profileDraft.expertise_tags} onChange={(e) => setProfileDraft({ ...profileDraft, expertise_tags: e.target.value })} placeholder="e.g. backend, machine learning, design" /></label>
+              <label><span>Links</span><input value={profileDraft.links} onChange={(e) => setProfileDraft({ ...profileDraft, links: e.target.value })} placeholder="https://github.com/you, https://linkedin.com/in/you" /></label>
+              <div className="editorActions">
+                <button type="submit" className="primaryButton" disabled={isBusy}>{isBusy ? 'Saving...' : 'Save Profile'}</button>
+                <button type="button" className="ghostButton" onClick={() => setPage('explore')}>Cancel</button>
+              </div>
+            </form>
+            <aside className="pageSurface writingGuide">
+              <p className="eyebrow">Profile Preview</p>
+              <div className="authorCard" style={{ marginTop: '0.5rem' }}>
+                {profileDraft.avatar_url
+                  ? <img src={profileDraft.avatar_url} alt="avatar" className="authorAvatar" style={{ objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none' }} />
+                  : <div className="authorAvatar">{currentUser?.username?.slice(0, 2).toUpperCase()}</div>
+                }
+                <div>
+                  <p className="eyebrow">Author</p>
+                  <h3>@{currentUser?.username}</h3>
+                </div>
+                {profileDraft.bio && <p className="authorBio">{profileDraft.bio}</p>}
+                {profileDraft.expertise_tags && (
+                  <div className="tagRow">
+                    {profileDraft.expertise_tags.split(',').map((t) => t.trim()).filter(Boolean).map((t) => (
+                      <span key={t} className="tagChip">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </aside>
+          </section>
+        )}
+
         {!isBootstrapping && page === 'article' && selectedArticle && (
           <>
           <ReadingProgress />
@@ -623,6 +710,26 @@ function App() {
               </section>
             </div>
             <aside className="articleSidebar">
+              {articleAuthor && (
+                <section className="pageSurface sidePanel authorCard">
+                  {articleAuthor.avatar_url
+                    ? <img src={articleAuthor.avatar_url} alt="avatar" className="authorAvatar" style={{ objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none' }} />
+                    : <div className="authorAvatar">{articleAuthor.username.slice(0, 2).toUpperCase()}</div>
+                  }
+                  <div>
+                    <p className="eyebrow">Author</p>
+                    <h3>@{articleAuthor.username}</h3>
+                  </div>
+                  {articleAuthor.bio && <p className="authorBio">{articleAuthor.bio}</p>}
+                  {articleAuthor.expertise_tags && (
+                    <div className="tagRow">
+                      {articleAuthor.expertise_tags.split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
+                        <span key={tag} className="tagChip">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">AI Summary</p>
                 <h3>Summarize this article</h3>
