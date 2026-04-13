@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles.css'
 
@@ -122,6 +122,36 @@ function App() {
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [editor, setEditor] = useState(EMPTY_EDITOR)
   const [editorMode, setEditorMode] = useState('create')
+  const [suggestions, setSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const debounceRef = useRef(null)
+
+  function handleSearchInput(value) {
+    setExploreQuery(value)
+    clearTimeout(debounceRef.current)
+    if (!value.trim()) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const results = await api(`/search?q=${encodeURIComponent(value.trim())}`, 'GET', token)
+        const valid = Array.isArray(results) ? results.filter((item) => item && item.title) : []
+        setSuggestions(valid)
+        setShowSuggestions(true)
+      } catch {
+        setSuggestions([])
+      }
+    }, 300)
+  }
+
+  function selectSuggestion(title) {
+    setExploreQuery(title)
+    setShowSuggestions(false)
+    setSuggestions([])
+    loadExplore(title).then(setExploreArticles).catch(() => {})
+  }
 
   const loggedIn = Boolean(token)
   const publishedCount = mineArticles.filter((article) => article.status === 'published').length
@@ -441,16 +471,33 @@ function App() {
 
         {!isBootstrapping && page === 'explore' && (
           <>
-            <section className="pageSurface pageHeader">
+            <section className="pageSurface pageHeader" style={{ zIndex: 10 }}>
               <div>
                 <p className="eyebrow">Read Across The Community</p>
                 <h2>Published articles from every user</h2>
                 <p>Browse the latest writing, search by topic, and open any article for comments, engagement, and AI summaries.</p>
               </div>
-              <form className="toolbar" onSubmit={refreshExplore}>
-                <input value={exploreQuery} onChange={(event) => setExploreQuery(event.target.value)} placeholder="Search by title, content, or tags" />
+              <form className="toolbar" onSubmit={(e) => { e.preventDefault(); setShowSuggestions(false); refreshExplore() }} style={{ position: 'relative', flexWrap: 'nowrap' }}>
+                <input
+                  value={exploreQuery}
+                  onChange={(event) => handleSearchInput(event.target.value)}
+                  onFocus={() => { if (suggestions.length || exploreQuery.trim()) setShowSuggestions(true) }}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  placeholder="Search by title, content, or tags"
+                />
                 <button type="submit" className="primaryButton" disabled={isBusy}>Search</button>
-                <button type="button" className="ghostButton" onClick={() => { setExploreQuery(''); refreshExplore() }}>Show Latest</button>
+                <button type="button" className="ghostButton" onClick={() => { setExploreQuery(''); setSuggestions([]); setShowSuggestions(false); loadExplore('') }}>Show Latest</button>
+                {showSuggestions && exploreQuery.trim() && (
+                  <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, margin: 0, padding: 0, listStyle: 'none', zIndex: 50, maxHeight: 240, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+                    {suggestions.length ? suggestions.map((item) => (
+                      <li key={item.id} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(0,0,0,0.06)', color: '#1a1a2e' }} onMouseDown={() => selectSuggestion(item.title)}>
+                        {item.title}
+                      </li>
+                    )) : (
+                      <li style={{ padding: '10px 14px', color: 'rgba(0,0,0,0.4)' }}>No results found</li>
+                    )}
+                  </ul>
+                )}
               </form>
             </section>
             {exploreArticles.length ? (
@@ -537,7 +584,7 @@ function App() {
         )}
 
         {!isBootstrapping && page === 'article' && selectedArticle && (
-          <section className="articleLayout">
+          <section className="articleLayout" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
             <article className="pageSurface articleDetail">
               <div className="articleDetailHeader">
                 <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
@@ -559,42 +606,40 @@ function App() {
                 {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
               </div>
             </article>
-            <aside className="articleSidebar">
-              <section className="pageSurface sidePanel">
-                <p className="eyebrow">Engagement</p>
-                <div className="statGrid slimStats">
-                  <div className="statCard"><strong>{articleStats?.like_count ?? 0}</strong><span>Likes</span></div>
-                  <div className="statCard"><strong>{articleStats?.comment_count ?? 0}</strong><span>Comments</span></div>
-                  <div className="statCard"><strong>{articleStats?.bookmarked ? 'Yes' : 'No'}</strong><span>Bookmarked</span></div>
-                </div>
-                <div className="stackedActions">
-                  <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
-                  <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
-                </div>
-              </section>
-              <section className="pageSurface sidePanel">
-                <p className="eyebrow">AI Summary</p>
-                <h3>Summarize this article</h3>
-                <p>Generate a quick TL;DR and takeaways without leaving the reading page.</p>
-                <div className="stackedActions">
-                  <button type="button" className="primaryButton" onClick={() => handleSummary(false)}>Generate Summary</button>
-                  <button type="button" className="ghostButton" onClick={() => handleSummary(true)}>Regenerate</button>
-                </div>
-                {summary && (
-                  <div className="summaryPanel">
-                    <h4>TL;DR</h4>
-                    <p>{summary.tldr}</p>
-                    <ul>{summary.takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
-                    <div className="feedbackRow">
-                      <button type="button" className="secondaryButton compactButton" onClick={() => handleSummaryFeedback(true)}>Helpful</button>
-                      <button type="button" className="ghostButton compactButton" onClick={() => handleSummaryFeedback(false)}>Not Helpful</button>
-                    </div>
-                    {feedbackMessage && <p className="subtleMessage">{feedbackMessage}</p>}
+            <section className="pageSurface sidePanel" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
+              <p className="eyebrow" style={{ width: '100%', margin: 0 }}>Engagement</p>
+              <div className="statGrid slimStats" style={{ flex: '1 1 auto' }}>
+                <div className="statCard"><strong>{articleStats?.like_count ?? 0}</strong><span>Likes</span></div>
+                <div className="statCard"><strong>{articleStats?.comment_count ?? 0}</strong><span>Comments</span></div>
+                <div className="statCard"><strong>{articleStats?.bookmarked ? 'Yes' : 'No'}</strong><span>Bookmarked</span></div>
+              </div>
+              <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
+                <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
+              </div>
+            </section>
+            <section className="pageSurface sidePanel">
+              <p className="eyebrow">AI Summary</p>
+              <h3>Summarize this article</h3>
+              <p>Generate a quick TL;DR and takeaways without leaving the reading page.</p>
+              <div className="stackedActions">
+                <button type="button" className="primaryButton" onClick={() => handleSummary(false)}>Generate Summary</button>
+                <button type="button" className="ghostButton" onClick={() => handleSummary(true)}>Regenerate</button>
+              </div>
+              {summary && (
+                <div className="summaryPanel">
+                  <h4>TL;DR</h4>
+                  <p>{summary.tldr}</p>
+                  <ul>{summary.takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
+                  <div className="feedbackRow">
+                    <button type="button" className="secondaryButton compactButton" onClick={() => handleSummaryFeedback(true)}>Helpful</button>
+                    <button type="button" className="ghostButton compactButton" onClick={() => handleSummaryFeedback(false)}>Not Helpful</button>
                   </div>
-                )}
-              </section>
-            </aside>
-            <section className="pageSurface commentsPanel">
+                  {feedbackMessage && <p className="subtleMessage">{feedbackMessage}</p>}
+                </div>
+              )}
+            </section>
+            <section className="pageSurface commentsPanel" style={{ gridColumn: 'auto' }}>
               <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
               <form className="commentComposer" onSubmit={handleComment}>
                 <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
