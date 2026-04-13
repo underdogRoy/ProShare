@@ -330,6 +330,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   align-items: end;
 }
 
+.pageHeader h2 { font-size: 1.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toolbar { justify-content: flex-end; }
 .toolbar input { flex: 1 1 260px; margin: 0; }
 
@@ -361,7 +362,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   gap: 1rem;
 }
 
-.articleGrid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.articleGrid { grid-template-columns: 1fr; }
 .statGrid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
 
 .articleCard {
@@ -394,7 +395,8 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   opacity: 1;
 }
 
-.articleCard h3 { min-height: 3rem; }
+.articleCard h3 { }
+.articleAuthor { font-size: 0.85rem; font-weight: 600; color: #a25a38; }
 .articleExcerpt { color: #4f5b68; }
 .articleCardFooter { justify-content: space-between; }
 .cardActions { margin-left: auto; }

@@ -82,7 +82,7 @@ function EmptyState({ title, text, actionLabel, onAction }) {
   )
 }
 
-function ArticleCard({ article, onOpen, onEdit, showEdit }) {
+function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
   return (
     <article className="pageSurface articleCard" onClick={() => onOpen(article.id)}>
       <div className="articleCardTop">
@@ -90,6 +90,7 @@ function ArticleCard({ article, onOpen, onEdit, showEdit }) {
         <span className="metaText">{readingTime(article.content)}</span>
       </div>
       <h3>{article.title}</h3>
+      {authorName && <span className="articleAuthor">by {authorName}</span>}
       <p className="articleExcerpt">{excerpt(article.content)}</p>
       <div className="tagRow">
         {(article.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
@@ -473,7 +474,7 @@ function App() {
             </section>
             {exploreArticles.length ? (
               <section className="articleGrid">
-                {exploreArticles.map((article) => <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'explore')} />)}
+                {exploreArticles.map((article) => <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'explore')} authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`} />)}
               </section>
             ) : (
               <EmptyState title="No articles matched this view" text="Try clearing the search box or publish the first article in the community." actionLabel="Start Writing" onAction={startNewArticle} />
@@ -508,7 +509,7 @@ function App() {
             {filteredMineArticles.length ? (
               <section className="articleGrid">
                 {filteredMineArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} showEdit />
+                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} showEdit authorName={`@${currentUser?.username}`} />
                 ))}
               </section>
             ) : (
