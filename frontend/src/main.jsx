@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 import './styles.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -13,7 +15,7 @@ async function api(path, method = 'GET', token = '', body) {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: body ? JSON.stringify(body) : undefined,
+body: body ? JSON.stringify(body) : undefined,
   })
   const text = await res.text()
   let data = {}
@@ -37,16 +39,32 @@ function formatDate(value) {
 
 function excerpt(text, length = 180) {
   if (!text) return ''
-  return text.length > length ? `${text.slice(0, length).trim()}...` : text
+  const plain = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+  return plain.length > length ? `${plain.slice(0, length).trim()}...` : plain
 }
 
 function readingTime(text) {
-  const words = text.trim().split(/\s+/).filter(Boolean).length
+  const plain = text.replace(/<[^>]*>/g, ' ')
+  const words = plain.trim().split(/\s+/).filter(Boolean).length
   return `${Math.max(1, Math.ceil(words / 180))} min read`
 }
 
 function normalizeEditor(article) {
   return { id: article.id ?? null, title: article.title ?? '', content: article.content ?? '', tags: article.tags ?? '', status: article.status ?? 'draft' }
+}
+
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0)
+  useEffect(() => {
+    function update() {
+      const el = document.documentElement
+      const total = el.scrollHeight - el.clientHeight
+      setProgress(total > 0 ? (el.scrollTop / total) * 100 : 0)
+    }
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
+  return <div className="readingProgress" style={{ width: `${progress}%` }} />
 }
 
 function StatusBadge({ status }) {
@@ -64,7 +82,7 @@ function EmptyState({ title, text, actionLabel, onAction }) {
   )
 }
 
-function ArticleCard({ article, onOpen, onEdit, showEdit }) {
+function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
   return (
     <article className="pageSurface articleCard" onClick={() => onOpen(article.id)}>
       <div className="articleCardTop">
@@ -72,6 +90,7 @@ function ArticleCard({ article, onOpen, onEdit, showEdit }) {
         <span className="metaText">{readingTime(article.content)}</span>
       </div>
       <h3>{article.title}</h3>
+      {authorName && <span className="articleAuthor">by {authorName}</span>}
       <p className="articleExcerpt">{excerpt(article.content)}</p>
       <div className="tagRow">
         {(article.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
@@ -455,7 +474,7 @@ function App() {
             </section>
             {exploreArticles.length ? (
               <section className="articleGrid">
-                {exploreArticles.map((article) => <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'explore')} />)}
+                {exploreArticles.map((article) => <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'explore')} authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`} />)}
               </section>
             ) : (
               <EmptyState title="No articles matched this view" text="Try clearing the search box or publish the first article in the community." actionLabel="Start Writing" onAction={startNewArticle} />
@@ -490,7 +509,7 @@ function App() {
             {filteredMineArticles.length ? (
               <section className="articleGrid">
                 {filteredMineArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} showEdit />
+                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} showEdit authorName={`@${currentUser?.username}`} />
                 ))}
               </section>
             ) : (
@@ -514,7 +533,24 @@ function App() {
                 <label><span>Tags</span><input value={editor.tags} onChange={(event) => setEditor({ ...editor, tags: event.target.value })} placeholder="leadership, backend, career" /></label>
                 <label><span>Status</span><select value={editor.status} onChange={(event) => setEditor({ ...editor, status: event.target.value })}><option value="published">Published</option><option value="draft">Draft</option></select></label>
               </div>
-              <label><span>Content</span><textarea rows={18} value={editor.content} onChange={(event) => setEditor({ ...editor, content: event.target.value })} placeholder="Write the article body here..." /></label>
+              <div className="richEditorWrapper">
+                <span className="richEditorLabel">Content</span>
+                <ReactQuill
+                  theme="snow"
+                  value={editor.content}
+                  onChange={(value) => setEditor({ ...editor, content: value })}
+                  placeholder="Write the article body here..."
+                  modules={{
+                    toolbar: [
+                      [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ color: [] }, { background: [] }],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
               <div className="editorActions">
                 <button type="submit" className="primaryButton" disabled={isBusy}>
                   {isBusy ? 'Saving...' : editorMode === 'create' ? editor.status === 'published' ? 'Publish Article' : 'Save Draft' : 'Save Changes'}
@@ -524,42 +560,37 @@ function App() {
             </form>
             <aside className="pageSurface writingGuide">
               <p className="eyebrow">Editor Notes</p>
-              <h3>Use this space for writing, not browsing</h3>
-              <p>This page is intentionally separate from the reader view so creating content feels focused instead of crowded.</p>
               <div className="statGrid slimStats">
-                <div className="statCard"><strong>{editor.title.trim() ? editor.title.trim().split(/\s+/).length : 0}</strong><span>Title Words</span></div>
-                <div className="statCard"><strong>{editor.content.trim() ? editor.content.trim().split(/\s+/).length : 0}</strong><span>Body Words</span></div>
+                <div className="statCard"><strong>{editor.content.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length}</strong><span>Word Count</span></div>
                 <div className="statCard"><strong>{readingTime(editor.content)}</strong><span>Estimated Read</span></div>
               </div>
-              <p className="guideHint">Tip: save as draft if the structure is still changing, then publish once the article is ready for the public feed.</p>
             </aside>
           </section>
         )}
 
         {!isBootstrapping && page === 'article' && selectedArticle && (
+          <>
+          <ReadingProgress />
           <section className="articleLayout">
-            <article className="pageSurface articleDetail">
-              <div className="articleDetailHeader">
-                <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
-                {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
-              </div>
-              <div className="metaCluster">
-                <StatusBadge status={selectedArticle.status} />
-                <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
-                <span className="metaText">{readingTime(selectedArticle.content)}</span>
-                <span className="metaText">Author #{selectedArticle.author_id}</span>
-              </div>
-              <h2>{selectedArticle.title}</h2>
-              <div className="tagRow">
-                {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
-                  <span key={tag} className="tagChip">{tag}</span>
-                ))}
-              </div>
-              <div className="articleBody">
-                {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-              </div>
-            </article>
-            <aside className="articleSidebar">
+            <div className="articleMain">
+              <article className="pageSurface articleDetail">
+                <div className="articleDetailHeader">
+                  <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
+                  {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
+                </div>
+                <div className="metaCluster">
+                  <StatusBadge status={selectedArticle.status} />
+                  <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
+                  <span className="metaText">{readingTime(selectedArticle.content)}</span>
+                </div>
+                <h2>{selectedArticle.title}</h2>
+                <div className="tagRow">
+                  {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
+                    <span key={tag} className="tagChip">{tag}</span>
+                  ))}
+                </div>
+                <div className="articleBody ql-snow"><div className="ql-editor" dangerouslySetInnerHTML={{ __html: selectedArticle.content }} /></div>
+              </article>
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">Engagement</p>
                 <div className="statGrid slimStats">
@@ -572,6 +603,26 @@ function App() {
                   <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
                 </div>
               </section>
+              <section className="pageSurface commentsPanel">
+                <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
+                <form className="commentComposer" onSubmit={handleComment}>
+                  <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
+                  <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
+                </form>
+                {comments.length ? (
+                  <div className="commentList">
+                    {comments.map((item) => (
+                      <article key={item.id} className="commentItem">
+                        <strong>User #{item.user_id}</strong>
+                        <span className="metaText">{formatDate(item.created_at)}</span>
+                        <p>{item.content}</p>
+                      </article>
+                    ))}
+                  </div>
+                ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
+              </section>
+            </div>
+            <aside className="articleSidebar">
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">AI Summary</p>
                 <h3>Summarize this article</h3>
@@ -594,25 +645,8 @@ function App() {
                 )}
               </section>
             </aside>
-            <section className="pageSurface commentsPanel">
-              <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
-              <form className="commentComposer" onSubmit={handleComment}>
-                <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
-                <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
-              </form>
-              {comments.length ? (
-                <div className="commentList">
-                  {comments.map((item) => (
-                    <article key={item.id} className="commentItem">
-                      <strong>User #{item.user_id}</strong>
-                      <span className="metaText">{formatDate(item.created_at)}</span>
-                      <p>{item.content}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
-            </section>
           </section>
+          </>
         )}
       </main>
     </div>
