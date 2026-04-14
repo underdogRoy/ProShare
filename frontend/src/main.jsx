@@ -6,6 +6,7 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const EMPTY_EDITOR = { id: null, title: '', content: '', tags: '', status: 'published' }
 const EMPTY_CREDENTIALS = { email: '', username: '', password: '' }
 const EMPTY_RESET = { token: '', newPassword: '', confirmPassword: '' }
+const EMPTY_PROFILE = { bio: '', expertise_tags: '', links: '' }
 
 async function api(path, method = 'GET', token = '', body) {
   const res = await fetch(`${API}${path}`, {
@@ -48,6 +49,10 @@ function readingTime(text) {
 
 function normalizeEditor(article) {
   return { id: article.id ?? null, title: article.title ?? '', content: article.content ?? '', tags: article.tags ?? '', status: article.status ?? 'draft' }
+}
+
+function parseTags(value) {
+  return value.split(',').map((item) => item.trim()).filter(Boolean)
 }
 
 function getResetTokenFromUrl() {
@@ -132,6 +137,8 @@ function App() {
   const [resetForm, setResetForm] = useState(() => ({ ...EMPTY_RESET, token: getResetTokenFromUrl() }))
   const [resetPreviewLink, setResetPreviewLink] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
+  const [profileDraft, setProfileDraft] = useState(EMPTY_PROFILE)
+  const [profileTagDraft, setProfileTagDraft] = useState('')
   const [notice, setNotice] = useState(null)
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(window.localStorage.getItem('proshare_token')))
   const [isBusy, setIsBusy] = useState(false)
@@ -188,6 +195,12 @@ function App() {
         const [profile, recent, mine] = await Promise.all([api('/users/me', 'GET', token), api('/feeds/recent', 'GET', token), api('/articles/mine', 'GET', token)])
         if (!active) return
         setCurrentUser(profile)
+        setProfileDraft({
+          bio: profile.bio || '',
+          expertise_tags: profile.expertise_tags || '',
+          links: profile.links || '',
+        })
+        setProfileTagDraft('')
         setExploreArticles(recent)
         setMineArticles(mine)
         setPage((current) => (current === 'auth' ? 'explore' : current))
@@ -259,6 +272,8 @@ function App() {
     setToken('')
     setCurrentUser(null)
     setCredentials(EMPTY_CREDENTIALS)
+    setProfileDraft(EMPTY_PROFILE)
+    setProfileTagDraft('')
     setEditor({ ...EMPTY_EDITOR })
     setEditorMode('create')
     setExploreArticles([])
@@ -487,6 +502,53 @@ function App() {
     }
   }
 
+  async function submitProfile(event) {
+    event.preventDefault()
+    setNotice(null)
+    if (profileDraft.bio.trim().length > 500) {
+      setNotice({ type: 'error', text: 'Bio must be 500 characters or fewer.' })
+      return
+    }
+    setIsBusy(true)
+    try {
+      await api('/users/me', 'PUT', token, {
+        bio: profileDraft.bio.trim(),
+        expertise_tags: profileDraft.expertise_tags.trim(),
+        links: profileDraft.links.trim(),
+      })
+      const profile = await api('/users/me', 'GET', token)
+      setCurrentUser(profile)
+      setProfileDraft({
+        bio: profile.bio || '',
+        expertise_tags: profile.expertise_tags || '',
+        links: profile.links || '',
+      })
+      setProfileTagDraft('')
+      setNotice({ type: 'success', text: 'Profile updated successfully.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  function addProfileTag() {
+    const nextTag = profileTagDraft.trim()
+    if (!nextTag) return
+    const existing = parseTags(profileDraft.expertise_tags)
+    if (existing.some((tag) => tag.toLowerCase() === nextTag.toLowerCase())) {
+      setProfileTagDraft('')
+      return
+    }
+    setProfileDraft({ ...profileDraft, expertise_tags: [...existing, nextTag].join(', ') })
+    setProfileTagDraft('')
+  }
+
+  function removeProfileTag(tagToRemove) {
+    const filtered = parseTags(profileDraft.expertise_tags).filter((tag) => tag !== tagToRemove)
+    setProfileDraft({ ...profileDraft, expertise_tags: filtered.join(', ') })
+  }
+
   async function handleReportArticle(event) {
     event.preventDefault()
     if (!selectedArticle) return
@@ -708,6 +770,7 @@ function App() {
           <button type="button" className={`navButton ${page === 'explore' ? 'active' : ''}`} onClick={() => setPage('explore')}>Explore</button>
           <button type="button" className={`navButton ${page === 'editor' ? 'active' : ''}`} onClick={startNewArticle}>Write</button>
           <button type="button" className={`navButton ${page === 'mine' ? 'active' : ''}`} onClick={() => { setPage('mine'); refreshMine() }}>My Articles</button>
+          <button type="button" className={`navButton ${page === 'profile' ? 'active' : ''}`} onClick={() => setPage('profile')}>Profile</button>
           {isAdmin && <button type="button" className={`navButton ${page === 'admin' ? 'active' : ''}`} onClick={() => { setPage('admin'); loadModerationReports(moderationFilter) }}>Admin</button>}
         </nav>
         <div className="headerActions">
@@ -777,6 +840,155 @@ function App() {
               <EmptyState title="No articles in this filter" text="Create a new piece or switch filters to see your other drafts and published posts." actionLabel="Write A New Article" onAction={startNewArticle} />
             )}
           </>
+        )}
+
+        {!isBootstrapping && page === 'profile' && currentUser && (
+          <>
+            <section className="pageSurface pageHeader">
+              <div>
+                <p className="eyebrow">Profile Studio</p>
+                <h2>@{currentUser.username}</h2>
+                <p>Shape how other professionals read your background, expertise, and writing focus. Your recent articles stay visible here as a quick portfolio view.</p>
+              </div>
+              <div className="profileHeaderAside">
+                <div className="statGrid">
+                  <div className="statCard"><strong>{mineArticles.length}</strong><span>Total Pieces</span></div>
+                  <div className="statCard"><strong>{publishedCount}</strong><span>Published</span></div>
+                  <div className="statCard"><strong>{draftCount}</strong><span>Drafts</span></div>
+                </div>
+                <div className="toolbar profileHeaderToolbar">
+                  <button type="button" className="ghostButton compactButton" onClick={() => setPage('profile-edit')}>Edit Profile</button>
+                  <button type="button" className="ghostButton compactButton" onClick={() => { setPage('mine'); refreshMine() }}>Manage Articles</button>
+                </div>
+              </div>
+            </section>
+            <section className="pageSurface profileOverview">
+                <div className="panelHeader">
+                  <div>
+                    <p className="eyebrow">About You</p>
+                    <h3>Professional snapshot</h3>
+                  </div>
+                  <span className="userPill">{currentUser.email}</span>
+                </div>
+                <div className="profileFactGrid">
+                  <div className="statCard">
+                    <strong>{currentUser.username}</strong>
+                    <span>Username</span>
+                  </div>
+                  <div className="statCard">
+                    <strong>{parseTags(currentUser.expertise_tags || '').length || 0}</strong>
+                    <span>Expertise Tags</span>
+                  </div>
+                  <div className="statCard">
+                    <strong>{publishedCount}</strong>
+                    <span>Published Articles</span>
+                  </div>
+                  <div className="statCard">
+                    <strong>{currentUser.links ? 'Yes' : 'No'}</strong>
+                    <span>Link Added</span>
+                  </div>
+                </div>
+                <div className="profileCopy">
+                  <h4>Bio</h4>
+                  <p>{currentUser.bio || 'Add a short bio so readers understand your perspective and background.'}</p>
+                </div>
+                <div className="profileCopy">
+                  <h4>Expertise</h4>
+                  <div className="tagRow">
+                    {parseTags(currentUser.expertise_tags || '').length
+                      ? parseTags(currentUser.expertise_tags || '').map((tag) => (
+                      <span key={tag} className="tagChip">{tag}</span>
+                        ))
+                      : <span className="metaText">No expertise tags yet.</span>}
+                  </div>
+                </div>
+                <div className="profileCopy">
+                  <h4>Links</h4>
+                  <p>{currentUser.links || 'Add a portfolio, LinkedIn, GitHub, or personal site link.'}</p>
+                </div>
+            </section>
+            <section className="pageSurface pageHeader portfolioHeader">
+              <div>
+                <p className="eyebrow">Writing Portfolio</p>
+                <h2>Browse your published voice and active drafts</h2>
+                <p>This portfolio view gathers your recent writing in one place, so readers can quickly understand what you create and jump straight into each piece.</p>
+              </div>
+              <div className="toolbar">
+                <button type="button" className="ghostButton" onClick={() => { setPage('mine'); refreshMine() }}>Manage In My Articles</button>
+              </div>
+            </section>
+            {mineArticles.length ? (
+              <section className="articleGrid portfolioGrid">
+                {mineArticles.map((article) => (
+                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'profile')} onEdit={startEditingArticle} showEdit />
+                ))}
+              </section>
+            ) : (
+              <EmptyState title="Your profile is ready for its first article" text="Publish or save a draft and it will appear here as part of your creator portfolio." actionLabel="Write Your First Article" onAction={startNewArticle} />
+            )}
+          </>
+        )}
+
+        {!isBootstrapping && page === 'profile-edit' && currentUser && (
+          <section className="profileLayout">
+            <form className="pageSurface profileEditor" onSubmit={submitProfile}>
+              <div className="panelHeader">
+                <div>
+                  <p className="eyebrow">Edit Profile</p>
+                  <h2>Update your creator card</h2>
+                </div>
+                <button type="button" className="ghostButton compactButton" onClick={() => setPage('profile')}>Back To Profile</button>
+              </div>
+              <label>
+                <span>Bio</span>
+                <textarea rows={7} value={profileDraft.bio} onChange={(event) => setProfileDraft({ ...profileDraft, bio: event.target.value })} placeholder="Share your background, interests, and what you write about." />
+                <span className="metaText">{profileDraft.bio.trim().length}/500 characters</span>
+              </label>
+              <div className="profileTagEditor">
+                <label>
+                  <span>Add Expertise Tag</span>
+                  <input
+                    value={profileTagDraft}
+                    onChange={(event) => setProfileTagDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault()
+                        addProfileTag()
+                      }
+                    }}
+                    placeholder="backend systems"
+                  />
+                </label>
+                <button type="button" className="ghostButton compactButton" onClick={addProfileTag}>Add Tag</button>
+              </div>
+              <div className="tagRow editableTagRow">
+                {parseTags(profileDraft.expertise_tags || '').length
+                  ? parseTags(profileDraft.expertise_tags || '').map((tag) => (
+                    <button key={tag} type="button" className="tagChip removableTag" onClick={() => removeProfileTag(tag)}>
+                      {tag} ×
+                    </button>
+                    ))
+                  : <span className="metaText">No expertise tags added yet.</span>}
+              </div>
+              <label>
+                <span>Links</span>
+                <input value={profileDraft.links} onChange={(event) => setProfileDraft({ ...profileDraft, links: event.target.value })} placeholder="LinkedIn, GitHub, portfolio, personal website" />
+              </label>
+              <div className="editorActions">
+                <button type="submit" className="primaryButton" disabled={isBusy}>{isBusy ? 'Saving...' : 'Save Profile'}</button>
+              </div>
+            </form>
+            <aside className="pageSurface writingGuide">
+              <p className="eyebrow">Editing Tips</p>
+              <h3>Make your profile easy to scan</h3>
+              <p>Keep the bio concise, use expertise tags for specialties, and add one clean link field for your most relevant external presence.</p>
+              <div className="statGrid slimStats">
+                <div className="statCard"><strong>{profileDraft.bio.trim() ? profileDraft.bio.trim().split(/\s+/).length : 0}</strong><span>Bio Words</span></div>
+                <div className="statCard"><strong>{parseTags(profileDraft.expertise_tags || '').length}</strong><span>Expertise Tags</span></div>
+                <div className="statCard"><strong>{profileDraft.links.trim() ? 'Yes' : 'No'}</strong><span>Link Added</span></div>
+              </div>
+            </aside>
+          </section>
         )}
 
         {!isBootstrapping && page === 'editor' && (
@@ -899,7 +1111,7 @@ function App() {
           <section className="articleLayout">
             <article className="pageSurface articleDetail">
               <div className="articleDetailHeader">
-                <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : 'Explore'}</button>
+                <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : articleReturnTo === 'profile' ? 'profile' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : articleReturnTo === 'profile' ? 'Profile' : 'Explore'}</button>
                 {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
               </div>
               <div className="metaCluster">

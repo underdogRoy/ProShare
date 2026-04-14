@@ -125,6 +125,12 @@ For Gmail:
 
 If SMTP is not configured, password reset still works in development mode by returning a preview reset link from the identity service.
 
+## Admin Testing Notes
+- Register a normal user account first.
+- In the identity database, update that user's `is_admin` field to `true`.
+- Sign out and sign back in so a fresh token includes admin access.
+- The frontend will then show an `Admin` tab for report review and article moderation.
+
 ## Frontend
 ```bash
 cd frontend
