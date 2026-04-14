@@ -42,7 +42,6 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-ProShare}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
       SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
-    depends_on: [postgres]
     depends_on:
       postgres:
         condition: service_healthy
