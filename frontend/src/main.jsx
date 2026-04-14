@@ -61,6 +61,14 @@ function syncResetTokenInUrl(token) {
   window.history.replaceState({}, '', url)
 }
 
+function resolutionActionLabel(action) {
+  if (action === 'deleted') return 'deleted'
+  if (action === 'hidden') return 'hidden'
+  if (action === 'unhidden') return 'unhidden'
+  if (action === 'resolved') return 'manually resolved'
+  return action || 'resolved'
+}
+
 function StatusBadge({ status }) {
   return <span className={`statusBadge status-${status}`}>{status === 'published' ? 'Published' : 'Draft'}</span>
 }
@@ -136,12 +144,16 @@ function App() {
   const [articleStats, setArticleStats] = useState(null)
   const [comments, setComments] = useState([])
   const [commentDraft, setCommentDraft] = useState('')
+  const [reportReason, setReportReason] = useState('')
+  const [moderationReports, setModerationReports] = useState([])
+  const [moderationFilter, setModerationFilter] = useState('open')
   const [summary, setSummary] = useState(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [editor, setEditor] = useState(EMPTY_EDITOR)
   const [editorMode, setEditorMode] = useState('create')
 
   const loggedIn = Boolean(token)
+  const isAdmin = Boolean(currentUser?.is_admin)
   const publishedCount = mineArticles.filter((article) => article.status === 'published').length
   const draftCount = mineArticles.filter((article) => article.status !== 'published').length
   const filteredMineArticles = mineArticles.filter((article) => mineFilter === 'all' || article.status === mineFilter)
@@ -156,6 +168,12 @@ function App() {
     setResetForm((current) => ({ ...current, token: urlToken || current.token }))
     if (!token && urlToken) setPage('reset-password')
   }, [token])
+
+  useEffect(() => {
+    if (!notice) return undefined
+    const timeoutId = window.setTimeout(() => setNotice(null), 4000)
+    return () => window.clearTimeout(timeoutId)
+  }, [notice])
 
   useEffect(() => {
     if (!token) {
@@ -202,6 +220,12 @@ function App() {
     return data
   }
 
+  async function loadModerationReports(filter = moderationFilter) {
+    const data = await api(`/admin/reports?status=${encodeURIComponent(filter)}`, 'GET', token)
+    setModerationReports(data)
+    return data
+  }
+
   async function openArticle(articleId, returnTo = 'explore') {
     const [article, articleComments, stats] = await Promise.all([
       api(`/articles/${articleId}`, 'GET', token),
@@ -212,6 +236,7 @@ function App() {
     setComments(articleComments)
     setArticleStats(stats)
     setCommentDraft('')
+    setReportReason('')
     setSummary(null)
     setFeedbackMessage('')
     setArticleReturnTo(returnTo)
@@ -241,6 +266,8 @@ function App() {
     setSelectedArticle(null)
     setSummary(null)
     setComments([])
+    setReportReason('')
+    setModerationReports([])
     setArticleStats(null)
     setFeedbackMessage('')
     setPage('auth')
@@ -460,6 +487,85 @@ function App() {
     }
   }
 
+  async function handleReportArticle(event) {
+    event.preventDefault()
+    if (!selectedArticle) return
+    if (!reportReason.trim()) {
+      setNotice({ type: 'error', text: 'Share a short reason before submitting a report.' })
+      return
+    }
+
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      await api('/reports', 'POST', token, {
+        target_type: 'article',
+        target_id: selectedArticle.id,
+        reason: reportReason.trim(),
+      })
+      setReportReason('')
+      setNotice({ type: 'success', text: 'Report submitted for moderator review.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleModerationAction(articleId, action) {
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      await api(`/admin/articles/${articleId}/${action}`, 'POST', token)
+      await Promise.all([loadModerationReports(moderationFilter), loadExplore(''), loadMine()])
+      if (selectedArticle?.id === articleId) {
+        setPage('admin')
+        setSelectedArticle(null)
+      }
+      setNotice({
+        type: 'success',
+        text:
+          action === 'hide'
+            ? 'Article hidden from the community feed.'
+            : action === 'unhide'
+              ? 'Article restored to the community feed.'
+              : 'Article deleted from the platform.',
+      })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleResolveReport(reportId, action = 'resolved') {
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      await api('/admin/reports/resolve', 'POST', token, { report_id: reportId, action })
+      await loadModerationReports(moderationFilter)
+      setNotice({ type: 'success', text: 'Report marked as resolved.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function handleReopenReport(reportId) {
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      await api(`/admin/reports/${reportId}/reopen`, 'POST', token)
+      await loadModerationReports(moderationFilter)
+      setNotice({ type: 'success', text: 'Report moved back to open.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
   if (!loggedIn) {
     return (
       <div className="authShell">
@@ -602,14 +708,15 @@ function App() {
           <button type="button" className={`navButton ${page === 'explore' ? 'active' : ''}`} onClick={() => setPage('explore')}>Explore</button>
           <button type="button" className={`navButton ${page === 'editor' ? 'active' : ''}`} onClick={startNewArticle}>Write</button>
           <button type="button" className={`navButton ${page === 'mine' ? 'active' : ''}`} onClick={() => { setPage('mine'); refreshMine() }}>My Articles</button>
+          {isAdmin && <button type="button" className={`navButton ${page === 'admin' ? 'active' : ''}`} onClick={() => { setPage('admin'); loadModerationReports(moderationFilter) }}>Admin</button>}
         </nav>
         <div className="headerActions">
           <div className="userSummary"><strong>{currentUser?.username || 'Writer'}</strong><span>{currentUser?.email || ''}</span></div>
           <button type="button" className="ghostButton" onClick={logout}>Log Out</button>
         </div>
       </header>
+      {notice && <div className={`toastNotice notice notice-${notice.type}`}>{notice.text}</div>}
       <main className="dashboard">
-        {notice && <div className={`notice notice-${notice.type}`}>{notice.text}</div>}
         {isBootstrapping && <div className="pageSurface loadingPanel">Loading your workspace...</div>}
 
         {!isBootstrapping && page === 'explore' && (
@@ -709,6 +816,85 @@ function App() {
           </section>
         )}
 
+        {!isBootstrapping && page === 'admin' && isAdmin && (
+          <>
+            <section className="pageSurface pageHeader">
+              <div>
+                <p className="eyebrow">Moderation Desk</p>
+                <h2>{moderationFilter === 'open' ? 'Review open reports' : 'Review resolved reports'}</h2>
+                <p>Inspect flagged content, track moderation status, and keep a clean history of actions taken on community reports.</p>
+              </div>
+              <div className="moderationHeaderActions">
+                <div className="modeSwitch moderationTabs">
+                  <button type="button" className={`modeButton ${moderationFilter === 'open' ? 'active' : ''}`} onClick={() => { setModerationFilter('open'); loadModerationReports('open') }}>Open</button>
+                  <button type="button" className={`modeButton ${moderationFilter === 'resolved' ? 'active' : ''}`} onClick={() => { setModerationFilter('resolved'); loadModerationReports('resolved') }}>Resolved</button>
+                </div>
+                <button type="button" className="ghostButton compactButton refreshButton" onClick={() => loadModerationReports(moderationFilter)} disabled={isBusy}>Refresh Reports</button>
+              </div>
+            </section>
+            {moderationReports.length ? (
+              <section className="moderationList">
+                {moderationReports.map((report) => (
+                  <article key={report.id} className="pageSurface moderationCard">
+                    <div className="panelHeader">
+                      <div>
+                        <p className="eyebrow">Report #{report.id}</p>
+                        <h3>{report.article?.title || `${report.target_type} #${report.target_id}`}</h3>
+                      </div>
+                      <div className="reportStatusBlock">
+                        <span className={`statusBadge ${report.status === 'resolved' ? 'status-resolved' : 'status-open'}`}>
+                          {report.status === 'resolved' ? 'Resolved' : 'Open'}
+                        </span>
+                        <span className="metaText">{formatDate(report.created_at)}</span>
+                      </div>
+                    </div>
+                    <p>{report.reason}</p>
+                    <div className="metaCluster">
+                      <span className="metaText">Reported by user #{report.reporter_id}</span>
+                      <span className="metaText">Target article #{report.target_id}</span>
+                      {report.article && <span className="metaText">{report.article.hidden ? 'Currently hidden' : 'Currently visible'}</span>}
+                      {report.article?.status === 'deleted' && <span className="metaText">Deleted</span>}
+                      {report.status === 'resolved' && report.resolution_action && <span className="metaText">Resolved via {resolutionActionLabel(report.resolution_action)}</span>}
+                      {report.status === 'resolved' && report.resolved_at && <span className="metaText">Resolved {formatDate(report.resolved_at)}</span>}
+                    </div>
+                    {report.target_type === 'article' && report.status === 'open' && (
+                      <div className="moderationActions">
+                        {!report.article?.hidden && report.article?.status !== 'deleted' && (
+                          <button type="button" className="primaryButton compactButton" onClick={() => handleModerationAction(report.target_id, 'hide')} disabled={isBusy}>Hide</button>
+                        )}
+                        {report.article?.hidden && report.article?.status !== 'deleted' && (
+                          <button type="button" className="secondaryButton compactButton" onClick={() => handleModerationAction(report.target_id, 'unhide')} disabled={isBusy}>Unhide</button>
+                        )}
+                        {report.article?.status !== 'deleted' && (
+                          <button type="button" className="ghostButton compactButton" onClick={() => handleModerationAction(report.target_id, 'remove')} disabled={isBusy}>Delete Article</button>
+                        )}
+                        <button
+                          type="button"
+                          className="secondaryButton compactButton"
+                          onClick={() => handleResolveReport(report.id, report.article?.status === 'deleted' ? 'deleted' : report.article?.hidden ? 'hidden' : 'unhidden')}
+                          disabled={isBusy}
+                        >
+                          Mark Resolved
+                        </button>
+                      </div>
+                    )}
+                    {report.status === 'resolved' && (
+                      <div className="moderationActions">
+                        <button type="button" className="ghostButton compactButton" onClick={() => handleReopenReport(report.id)} disabled={isBusy}>Reopen Report</button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </section>
+            ) : (
+              <EmptyState
+                title={moderationFilter === 'open' ? 'No open reports to review' : 'No resolved reports yet'}
+                text={moderationFilter === 'open' ? 'Once readers flag content, reports will appear here for moderation.' : 'Resolved moderation actions will be collected here as history.'}
+              />
+            )}
+          </>
+        )}
+
         {!isBootstrapping && page === 'article' && selectedArticle && (
           <section className="articleLayout">
             <article className="pageSurface articleDetail">
@@ -765,6 +951,18 @@ function App() {
                     {feedbackMessage && <p className="subtleMessage">{feedbackMessage}</p>}
                   </div>
                 )}
+              </section>
+              <section className="pageSurface sidePanel">
+                <p className="eyebrow">Safety</p>
+                <h3>Report this article</h3>
+                <p>Flag content that needs moderator attention and include a short reason.</p>
+                <form className="authForm" onSubmit={handleReportArticle}>
+                  <label>
+                    <span>Reason</span>
+                    <textarea rows={4} value={reportReason} onChange={(event) => setReportReason(event.target.value)} placeholder="Explain what should be reviewed" />
+                  </label>
+                  <button type="submit" className="ghostButton" disabled={isBusy}>Submit Report</button>
+                </form>
               </section>
             </aside>
             <section className="pageSurface commentsPanel">

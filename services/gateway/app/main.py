@@ -30,9 +30,10 @@ async def request_json(method: str, url: str, request: Request | None = None, js
     params = None
     body = None
     if request is not None:
-        headers = {k: v for k, v in request.headers.items() if k.lower() != "host"}
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in {"host", "content-length"}}
         params = request.query_params
-        body = await request.body()
+        if json_body is None:
+            body = await request.body()
 
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.request(method, url, headers=headers, params=params, content=body, json=json_body)
@@ -126,3 +127,33 @@ async def search_proxy(request: Request):
 @app.api_route('/reports', methods=['POST'])
 async def report_proxy(request: Request):
     return await request_json('POST', f"{ENGAGEMENT}/reports", request=request)
+
+
+@app.api_route('/admin/reports', methods=['GET'])
+async def admin_reports(request: Request):
+    reports = await request_json('GET', f"{ENGAGEMENT}/admin/reports", request=request)
+    enriched = []
+    for report in reports:
+        article = None
+        if report.get("target_type") == "article":
+            try:
+                article = await request_json("GET", f"{CONTENT}/admin/articles/{report['target_id']}", request=request)
+            except HTTPException:
+                article = None
+        enriched.append({**report, "article": article})
+    return enriched
+
+
+@app.api_route('/admin/articles/{article_id}/{action}', methods=['POST'])
+async def admin_article_action(article_id: int, action: str, request: Request):
+    return await request_json('POST', f"{CONTENT}/admin/articles/{article_id}/{action}", request=request)
+
+
+@app.api_route('/admin/reports/resolve', methods=['POST'])
+async def admin_resolve_report(request: Request):
+    return await request_json('POST', f"{ENGAGEMENT}/admin/reports/resolve", request=request)
+
+
+@app.api_route('/admin/reports/{report_id}/reopen', methods=['POST'])
+async def admin_reopen_report(report_id: int, request: Request):
+    return await request_json('POST', f"{ENGAGEMENT}/admin/reports/{report_id}/reopen", request=request)

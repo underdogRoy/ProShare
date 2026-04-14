@@ -94,6 +94,7 @@ body::after {
 .editorPanel,
 .writingGuide,
 .articleCard,
+.moderationCard,
 .articleDetail,
 .sidePanel,
 .commentsPanel,
@@ -128,6 +129,9 @@ p { margin: 0; line-height: 1.7; }
 .tagRow,
 .brandRow,
 .navBar,
+.moderationActions,
+.reportStatusBlock,
+.moderationHeaderActions,
 .headerActions,
 .toolbar,
 .splitFields,
@@ -316,16 +320,26 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   font-weight: 600;
 }
 
+.toastNotice {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 20;
+  width: min(420px, calc(100vw - 2rem));
+  box-shadow: 0 18px 40px rgba(27, 36, 50, 0.16);
+  animation: toastIn 0.2s ease, toastOut 0.25s ease 3.7s forwards;
+}
+
 .notice-success {
-  background: rgba(68, 120, 71, 0.12);
-  color: #2f6534;
-  border: 1px solid rgba(68, 120, 71, 0.2);
+  background: #e5f4e7;
+  color: #24552a;
+  border: 1px solid #b7d6bb;
 }
 
 .notice-error {
-  background: rgba(186, 75, 50, 0.12);
-  color: #8b311c;
-  border: 1px solid rgba(186, 75, 50, 0.2);
+  background: #f8e2db;
+  color: #7c2614;
+  border: 1px solid #e6b3a5;
 }
 
 .resetPreview {
@@ -336,18 +350,68 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 }
 
 .articleGrid,
-.statGrid {
+.statGrid,
+.moderationList {
   display: grid;
   gap: 1rem;
 }
 
 .articleGrid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
 .statGrid { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+.moderationList { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 
 .articleCard {
   cursor: pointer;
   display: grid;
   gap: 0.95rem;
+}
+
+.moderationCard {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  min-height: 260px;
+}
+
+.moderationActions {
+  justify-content: flex-start;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.moderationActions > button {
+  min-width: 140px;
+}
+
+.moderationHeaderActions {
+  justify-content: flex-end;
+  align-items: center;
+  align-self: center;
+}
+
+.moderationTabs {
+  justify-content: flex-end;
+}
+
+.refreshButton {
+  width: auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.reportStatusBlock {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.status-open {
+  color: #8a4e22;
+  background: rgba(198, 93, 60, 0.14);
+}
+
+.status-resolved {
+  color: #2b6834;
+  background: rgba(84, 151, 96, 0.15);
 }
 
 .articleCard h3 { min-height: 3rem; }
@@ -465,6 +529,28 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   }
 }
 
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
 @keyframes drift {
   0%, 100% { transform: translate3d(0, 0, 0); }
   50% { transform: translate3d(18px, -16px, 0); }
@@ -506,4 +592,10 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .editorActions,
   .articleDetailHeader { flex-direction: column; align-items: stretch; }
   .cardActions { margin-left: 0; }
+  .toastNotice {
+    top: 0.75rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+  }
 }

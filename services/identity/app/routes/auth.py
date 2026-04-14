@@ -20,7 +20,7 @@ def register(payload: RegisterIn, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
-    return {"access_token": create_token(user.id, JWT_SECRET)}
+    return {"access_token": create_token(user.id, JWT_SECRET, is_admin=user.is_admin)}
 
 
 @router.post("/login")
@@ -28,7 +28,7 @@ def login(payload: LoginIn, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"access_token": create_token(user.id, JWT_SECRET)}
+    return {"access_token": create_token(user.id, JWT_SECRET, is_admin=user.is_admin)}
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordOut)

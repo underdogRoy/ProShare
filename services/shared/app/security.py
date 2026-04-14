@@ -15,17 +15,24 @@ def verify_password(password: str, password_hash: str) -> bool:
     return pwd_context.verify(password, password_hash)
 
 
-def create_token(user_id: int, secret: str, minutes: int = 60 * 24) -> str:
+def create_token(user_id: int, secret: str, minutes: int = 60 * 24, is_admin: bool = False) -> str:
     payload = {
         "sub": str(user_id),
+        "is_admin": is_admin,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes),
     }
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
-def decode_token(token: str, secret: str) -> int:
+def decode_token_payload(token: str, secret: str) -> dict:
     try:
         payload = jwt.decode(token, secret, algorithms=["HS256"])
-        return int(payload["sub"])
-    except (JWTError, KeyError, ValueError) as exc:
+        payload["sub"] = int(payload["sub"])
+        payload["is_admin"] = bool(payload.get("is_admin", False))
+        return payload
+    except (JWTError, KeyError, ValueError, TypeError) as exc:
         raise ValueError("Invalid token") from exc
+
+
+def decode_token(token: str, secret: str) -> int:
+    return int(decode_token_payload(token, secret)["sub"])
