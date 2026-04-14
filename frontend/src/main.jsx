@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import ReactQuill from 'react-quill'
+import 'react-quill/dist/quill.snow.css'
 import './styles.css'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -37,13 +39,18 @@ function formatDate(value) {
   return new Date(value).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-function excerpt(text, length = 180) {
+function plainText(text) {
   if (!text) return ''
-  return text.length > length ? `${text.slice(0, length).trim()}...` : text
+  return text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function excerpt(text, length = 180) {
+  const plain = plainText(text)
+  return plain.length > length ? `${plain.slice(0, length).trim()}...` : plain
 }
 
 function readingTime(text) {
-  const words = text.trim().split(/\s+/).filter(Boolean).length
+  const words = plainText(text).split(/\s+/).filter(Boolean).length
   return `${Math.max(1, Math.ceil(words / 180))} min read`
 }
 
@@ -74,6 +81,24 @@ function resolutionActionLabel(action) {
   return action || 'resolved'
 }
 
+function ReadingProgress() {
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    function update() {
+      const el = document.documentElement
+      const total = el.scrollHeight - el.clientHeight
+      setProgress(total > 0 ? (el.scrollTop / total) * 100 : 0)
+    }
+
+    update()
+    window.addEventListener('scroll', update, { passive: true })
+    return () => window.removeEventListener('scroll', update)
+  }, [])
+
+  return <div className="readingProgress" style={{ width: `${progress}%` }} />
+}
+
 function StatusBadge({ status }) {
   return <span className={`statusBadge status-${status}`}>{status === 'published' ? 'Published' : 'Draft'}</span>
 }
@@ -89,7 +114,7 @@ function EmptyState({ title, text, actionLabel, onAction }) {
   )
 }
 
-function ArticleCard({ article, onOpen, onEdit, showEdit }) {
+function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
   return (
     <article className="pageSurface articleCard" onClick={() => onOpen(article.id)}>
       <div className="articleCardTop">
@@ -97,6 +122,7 @@ function ArticleCard({ article, onOpen, onEdit, showEdit }) {
         <span className="metaText">{readingTime(article.content)}</span>
       </div>
       <h3>{article.title}</h3>
+      {authorName && <span className="articleAuthor">by {authorName}</span>}
       <p className="articleExcerpt">{excerpt(article.content)}</p>
       <div className="tagRow">
         {(article.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
@@ -651,7 +677,7 @@ function App() {
         <section className="pageSurface authPanel">
           {page === 'auth' && (
             <>
-              <div className="panelHeader">
+              <div className="panelHeader authPanelHeader">
                 <p className="eyebrow">Access Your Workspace</p>
                 <div className="modeSwitch">
                   <button type="button" className={`modeButton ${authMode === 'login' ? 'active' : ''}`} onClick={() => setAuthMode('login')}>Login</button>
@@ -664,7 +690,7 @@ function App() {
                   <label><span>Username</span><input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Choose a public handle" /></label>
                 )}
                 <label><span>Password</span><input type="password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="At least 8 characters" /></label>
-                <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Please wait...' : authMode === 'login' ? 'Sign In' : 'Create Account'}</button>
+                <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Please wait...' : authMode === 'login' ? 'Login' : 'Register'}</button>
               </form>
               {authMode === 'login' && (
                 <button
@@ -784,7 +810,7 @@ function App() {
 
         {!isBootstrapping && page === 'explore' && (
           <>
-            <section className="pageSurface pageHeader">
+            <section className="pageSurface pageHeader profilePageHeader">
               <div>
                 <p className="eyebrow">Read Across The Community</p>
                 <h2>Published articles from every user</h2>
@@ -798,7 +824,14 @@ function App() {
             </section>
             {exploreArticles.length ? (
               <section className="articleGrid">
-                {exploreArticles.map((article) => <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'explore')} />)}
+                {exploreArticles.map((article) => (
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    onOpen={(id) => handleOpenArticle(id, 'explore')}
+                    authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                  />
+                ))}
               </section>
             ) : (
               <EmptyState title="No articles matched this view" text="Try clearing the search box or publish the first article in the community." actionLabel="Start Writing" onAction={startNewArticle} />
@@ -885,7 +918,7 @@ function App() {
                   </div>
                   <div className="statCard">
                     <strong>{currentUser.links ? 'Yes' : 'No'}</strong>
-                    <span>Link Added</span>
+                    <span>Portfolio Link</span>
                   </div>
                 </div>
                 <div className="profileCopy">
@@ -1006,7 +1039,24 @@ function App() {
                 <label><span>Tags</span><input value={editor.tags} onChange={(event) => setEditor({ ...editor, tags: event.target.value })} placeholder="leadership, backend, career" /></label>
                 <label><span>Status</span><select value={editor.status} onChange={(event) => setEditor({ ...editor, status: event.target.value })}><option value="published">Published</option><option value="draft">Draft</option></select></label>
               </div>
-              <label><span>Content</span><textarea rows={18} value={editor.content} onChange={(event) => setEditor({ ...editor, content: event.target.value })} placeholder="Write the article body here..." /></label>
+              <div className="richEditorWrapper">
+                <span className="richEditorLabel">Content</span>
+                <ReactQuill
+                  theme="snow"
+                  value={editor.content}
+                  onChange={(value) => setEditor({ ...editor, content: value })}
+                  placeholder="Write the article body here..."
+                  modules={{
+                    toolbar: [
+                      [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ color: [] }, { background: [] }],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['clean'],
+                    ],
+                  }}
+                />
+              </div>
               <div className="editorActions">
                 <button type="submit" className="primaryButton" disabled={isBusy}>
                   {isBusy ? 'Saving...' : editorMode === 'create' ? editor.status === 'published' ? 'Publish Article' : 'Save Draft' : 'Save Changes'}
@@ -1020,7 +1070,7 @@ function App() {
               <p>This page is intentionally separate from the reader view so creating content feels focused instead of crowded.</p>
               <div className="statGrid slimStats">
                 <div className="statCard"><strong>{editor.title.trim() ? editor.title.trim().split(/\s+/).length : 0}</strong><span>Title Words</span></div>
-                <div className="statCard"><strong>{editor.content.trim() ? editor.content.trim().split(/\s+/).length : 0}</strong><span>Body Words</span></div>
+                <div className="statCard"><strong>{plainText(editor.content) ? plainText(editor.content).split(/\s+/).length : 0}</strong><span>Body Words</span></div>
                 <div className="statCard"><strong>{readingTime(editor.content)}</strong><span>Estimated Read</span></div>
               </div>
               <p className="guideHint">Tip: save as draft if the structure is still changing, then publish once the article is ready for the public feed.</p>
@@ -1108,41 +1158,63 @@ function App() {
         )}
 
         {!isBootstrapping && page === 'article' && selectedArticle && (
-          <section className="articleLayout">
-            <article className="pageSurface articleDetail">
-              <div className="articleDetailHeader">
-                <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : articleReturnTo === 'profile' ? 'profile' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : articleReturnTo === 'profile' ? 'Profile' : 'Explore'}</button>
-                {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
+          <>
+            <ReadingProgress />
+            <section className="articleLayout">
+              <div className="articleMain">
+                <article className="pageSurface articleDetail">
+                  <div className="articleDetailHeader">
+                    <button type="button" className="ghostButton" onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : articleReturnTo === 'profile' ? 'profile' : 'explore')}>Back To {articleReturnTo === 'mine' ? 'My Articles' : articleReturnTo === 'profile' ? 'Profile' : 'Explore'}</button>
+                    {selectedArticle.author_id === currentUser?.id && <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>Edit Article</button>}
+                  </div>
+                  <div className="metaCluster">
+                    <StatusBadge status={selectedArticle.status} />
+                    <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
+                    <span className="metaText">{readingTime(selectedArticle.content)}</span>
+                    <span className="metaText">Author #{selectedArticle.author_id}</span>
+                  </div>
+                  <h2>{selectedArticle.title}</h2>
+                  <div className="tagRow">
+                    {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
+                      <span key={tag} className="tagChip">{tag}</span>
+                    ))}
+                  </div>
+                  <div className="articleBody ql-snow">
+                    <div className="ql-editor" dangerouslySetInnerHTML={{ __html: selectedArticle.content }} />
+                  </div>
+                </article>
+                <section className="pageSurface sidePanel">
+                  <p className="eyebrow">Engagement</p>
+                  <div className="statGrid slimStats">
+                    <div className="statCard"><strong>{articleStats?.like_count ?? 0}</strong><span>Likes</span></div>
+                    <div className="statCard"><strong>{articleStats?.comment_count ?? 0}</strong><span>Comments</span></div>
+                    <div className="statCard"><strong>{articleStats?.bookmarked ? 'Yes' : 'No'}</strong><span>Bookmarked</span></div>
+                  </div>
+                  <div className="stackedActions">
+                    <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
+                    <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
+                  </div>
+                </section>
+                <section className="pageSurface commentsPanel">
+                  <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
+                  <form className="commentComposer" onSubmit={handleComment}>
+                    <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
+                    <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
+                  </form>
+                  {comments.length ? (
+                    <div className="commentList">
+                      {comments.map((item) => (
+                        <article key={item.id} className="commentItem">
+                          <strong>User #{item.user_id}</strong>
+                          <span className="metaText">{formatDate(item.created_at)}</span>
+                          <p>{item.content}</p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
+                </section>
               </div>
-              <div className="metaCluster">
-                <StatusBadge status={selectedArticle.status} />
-                <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
-                <span className="metaText">{readingTime(selectedArticle.content)}</span>
-                <span className="metaText">Author #{selectedArticle.author_id}</span>
-              </div>
-              <h2>{selectedArticle.title}</h2>
-              <div className="tagRow">
-                {(selectedArticle.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
-                  <span key={tag} className="tagChip">{tag}</span>
-                ))}
-              </div>
-              <div className="articleBody">
-                {selectedArticle.content.split(/\n+/).filter((paragraph) => paragraph.trim()).map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
-              </div>
-            </article>
-            <aside className="articleSidebar">
-              <section className="pageSurface sidePanel">
-                <p className="eyebrow">Engagement</p>
-                <div className="statGrid slimStats">
-                  <div className="statCard"><strong>{articleStats?.like_count ?? 0}</strong><span>Likes</span></div>
-                  <div className="statCard"><strong>{articleStats?.comment_count ?? 0}</strong><span>Comments</span></div>
-                  <div className="statCard"><strong>{articleStats?.bookmarked ? 'Yes' : 'No'}</strong><span>Bookmarked</span></div>
-                </div>
-                <div className="stackedActions">
-                  <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
-                  <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
-                </div>
-              </section>
+              <aside className="articleSidebar">
               <section className="pageSurface sidePanel">
                 <p className="eyebrow">AI Summary</p>
                 <h3>Summarize this article</h3>
@@ -1176,26 +1248,9 @@ function App() {
                   <button type="submit" className="ghostButton" disabled={isBusy}>Submit Report</button>
                 </form>
               </section>
-            </aside>
-            <section className="pageSurface commentsPanel">
-              <div className="panelHeader"><div><p className="eyebrow">Discussion</p><h3>Comments</h3></div></div>
-              <form className="commentComposer" onSubmit={handleComment}>
-                <input value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Add a thoughtful response" />
-                <button type="submit" className="primaryButton" disabled={isBusy}>Post Comment</button>
-              </form>
-              {comments.length ? (
-                <div className="commentList">
-                  {comments.map((item) => (
-                    <article key={item.id} className="commentItem">
-                      <strong>User #{item.user_id}</strong>
-                      <span className="metaText">{formatDate(item.created_at)}</span>
-                      <p>{item.content}</p>
-                    </article>
-                  ))}
-                </div>
-              ) : <p className="subtleMessage">No comments yet. Start the discussion.</p>}
+              </aside>
             </section>
-          </section>
+          </>
         )}
       </main>
     </div>
