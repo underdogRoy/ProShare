@@ -9,3 +9,6 @@ proshare.db
 .local-data/
 .local-run/
 .DS_Store
+.env
+.env.*
+!.env.example

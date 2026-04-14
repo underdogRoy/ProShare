@@ -82,6 +82,55 @@ Notes:
 - Summary cache is in-memory during local mode, so restarting the summary service clears cached summaries
 - The Docker workflow still uses PostgreSQL + Redis as before
 
+## Password Reset Email Setup
+The identity service supports real SMTP delivery for password reset emails.
+
+Recommended setup:
+1. Copy `.env.example` to `.env`
+2. Fill in your Gmail address and Google App Password
+3. Start the stack with `docker compose up --build`
+4. Keep the frontend running at `http://localhost:5173` so reset links open correctly
+
+Example Gmail template:
+```env
+PASSWORD_RESET_URL_BASE=http://localhost:5173
+SMTP_PROVIDER=gmail
+SMTP_USERNAME=your_gmail@gmail.com
+SMTP_PASSWORD=your_16_digit_google_app_password
+SMTP_FROM_EMAIL=your_gmail@gmail.com
+SMTP_FROM_NAME=ProShare
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
+IDENTITY_SHOW_RESET_LINK=false
+```
+
+Environment variables:
+- `PASSWORD_RESET_URL_BASE` - frontend base URL used in reset links
+- `SMTP_PROVIDER` - optional shortcut such as `gmail` or `outlook`
+- `SMTP_HOST`, `SMTP_PORT` - override SMTP server details directly
+- `SMTP_USERNAME`, `SMTP_PASSWORD` - SMTP login credentials
+- `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` - sender identity shown to users
+- `SMTP_USE_TLS`, `SMTP_USE_SSL` - transport security flags
+- `IDENTITY_SHOW_RESET_LINK` - when `true`, the API also returns a development reset link if SMTP is not configured
+
+Common presets:
+- Gmail: set `SMTP_PROVIDER=gmail` and use an app password for `SMTP_PASSWORD`
+- Outlook/Hotmail: set `SMTP_PROVIDER=outlook`
+
+For Gmail:
+1. Open your Google Account security settings
+2. Turn on `2-Step Verification`
+3. Create an `App Password`
+4. Paste that generated 16-character password into `SMTP_PASSWORD`
+
+If SMTP is not configured, password reset still works in development mode by returning a preview reset link from the identity service.
+
+## Admin Testing Notes
+- Register a normal user account first.
+- In the identity database, update that user's `is_admin` field to `true`.
+- Sign out and sign back in so a fresh token includes admin access.
+- The frontend will then show an `Admin` tab for report review and article moderation.
+
 ## Frontend
 ```bash
 cd frontend

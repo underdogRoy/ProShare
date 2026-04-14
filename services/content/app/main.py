@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, DateTime, Integer, String, Text, desc, func
 from sqlalchemy.orm import Mapped, Session, declarative_base, mapped_column, sessionmaker
 
 from services.shared.app.database import build_engine
-from services.shared.app.security import decode_token
+from services.shared.app.security import decode_token, decode_token_payload
 
 DATABASE_URL = os.getenv("CONTENT_DB_URL", "postgresql+psycopg://postgres:postgres@localhost:5432/proshare_content")
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-secret")
@@ -63,6 +63,13 @@ def current_user_id(credentials: HTTPAuthorizationCredentials = Depends(auth)) -
     return decode_token(credentials.credentials, JWT_SECRET)
 
 
+def require_admin(credentials: HTTPAuthorizationCredentials = Depends(auth)) -> int:
+    payload = decode_token_payload(credentials.credentials, JWT_SECRET)
+    if not payload["is_admin"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return int(payload["sub"])
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -82,6 +89,8 @@ def update_article(article_id: int, payload: ArticlePatch, user_id: int = Depend
     article = db.query(Article).filter(Article.id == article_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="Not found")
+    if article.status == "deleted":
+        raise HTTPException(status_code=400, detail="Deleted articles cannot be edited")
     if article.author_id != user_id:
         raise HTTPException(status_code=403, detail="Forbidden")
 
@@ -97,7 +106,7 @@ def update_article(article_id: int, payload: ArticlePatch, user_id: int = Depend
 def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
     return (
         db.query(Article)
-        .filter(Article.author_id == user_id)
+        .filter(Article.author_id == user_id, Article.status != "deleted")
         .order_by(desc(Article.updated_at))
         .all()
     )
@@ -105,7 +114,11 @@ def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(g
 
 @app.get("/articles/{article_id}")
 def get_article(article_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
-    article = db.query(Article).filter(Article.id == article_id, Article.hidden.is_(False)).first()
+    article = (
+        db.query(Article)
+        .filter(Article.id == article_id, Article.hidden.is_(False), Article.status != "deleted")
+        .first()
+    )
     if not article:
         raise HTTPException(status_code=404, detail="Not found")
     if article.status != "published" and article.author_id != user_id:
@@ -145,10 +158,51 @@ def search(q: str = Query(""), db: Session = Depends(get_db)):
 
 
 @app.post("/admin/articles/{article_id}/hide")
-def hide_article(article_id: int, db: Session = Depends(get_db)):
+def hide_article(article_id: int, admin_id: int = Depends(require_admin), db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Not found")
+    if article.status == "deleted":
+        raise HTTPException(status_code=400, detail="Article already removed")
+    article.hidden = True
+    db.commit()
+    return {"ok": True, "action": "hidden", "article_id": article.id, "admin_id": admin_id}
+
+
+@app.get("/admin/articles/{article_id}")
+def admin_get_article(article_id: int, admin_id: int = Depends(require_admin), db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {
+        "id": article.id,
+        "title": article.title,
+        "status": article.status,
+        "hidden": article.hidden,
+        "author_id": article.author_id,
+        "updated_at": article.updated_at,
+        "admin_id": admin_id,
+    }
+
+
+@app.post("/admin/articles/{article_id}/unhide")
+def unhide_article(article_id: int, admin_id: int = Depends(require_admin), db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Not found")
+    if article.status == "deleted":
+        raise HTTPException(status_code=400, detail="Deleted articles cannot be restored from hide")
+    article.hidden = False
+    db.commit()
+    return {"ok": True, "action": "visible", "article_id": article.id, "admin_id": admin_id}
+
+
+@app.post("/admin/articles/{article_id}/remove")
+def remove_article(article_id: int, admin_id: int = Depends(require_admin), db: Session = Depends(get_db)):
     article = db.query(Article).filter(Article.id == article_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="Not found")
     article.hidden = True
+    article.status = "deleted"
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "action": "removed", "article_id": article.id, "admin_id": admin_id}
