@@ -173,7 +173,8 @@ p { margin: 0; line-height: 1.7; }
 .writingGuide,
 .sidePanel,
 .commentsPanel,
-.filterBar {
+.filterBar,
+.resetPreview {
   display: grid;
   gap: 1rem;
 }
@@ -250,6 +251,21 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   border: 1px solid rgba(31, 53, 81, 0.13);
 }
 
+.textButton {
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #a25a38;
+  font-weight: 700;
+  justify-self: start;
+  box-shadow: none;
+}
+
+.textButton:hover {
+  transform: none;
+  opacity: 0.85;
+}
+
 .wideButton { width: 100%; justify-content: center; }
 .compactButton { padding: 0.55rem 0.9rem; font-size: 0.92rem; }
 
@@ -310,6 +326,13 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   background: rgba(186, 75, 50, 0.12);
   color: #8b311c;
   border: 1px solid rgba(186, 75, 50, 0.2);
+}
+
+.resetPreview {
+  padding: 1rem;
+  border-radius: 22px;
+  background: rgba(32, 74, 116, 0.08);
+  border: 1px solid rgba(32, 74, 116, 0.1);
 }
 
 .articleGrid,

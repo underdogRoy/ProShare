@@ -5,6 +5,7 @@ import './styles.css'
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const EMPTY_EDITOR = { id: null, title: '', content: '', tags: '', status: 'published' }
 const EMPTY_CREDENTIALS = { email: '', username: '', password: '' }
+const EMPTY_RESET = { token: '', newPassword: '', confirmPassword: '' }
 
 async function api(path, method = 'GET', token = '', body) {
   const res = await fetch(`${API}${path}`, {
@@ -47,6 +48,17 @@ function readingTime(text) {
 
 function normalizeEditor(article) {
   return { id: article.id ?? null, title: article.title ?? '', content: article.content ?? '', tags: article.tags ?? '', status: article.status ?? 'draft' }
+}
+
+function getResetTokenFromUrl() {
+  return new URLSearchParams(window.location.search).get('reset_token') || ''
+}
+
+function syncResetTokenInUrl(token) {
+  const url = new URL(window.location.href)
+  if (token) url.searchParams.set('reset_token', token)
+  else url.searchParams.delete('reset_token')
+  window.history.replaceState({}, '', url)
 }
 
 function StatusBadge({ status }) {
@@ -102,9 +114,15 @@ function ArticleCard({ article, onOpen, onEdit, showEdit }) {
 
 function App() {
   const [token, setToken] = useState(() => window.localStorage.getItem('proshare_token') || '')
-  const [page, setPage] = useState(() => (window.localStorage.getItem('proshare_token') ? 'explore' : 'auth'))
+  const [page, setPage] = useState(() => {
+    if (window.localStorage.getItem('proshare_token')) return 'explore'
+    return getResetTokenFromUrl() ? 'reset-password' : 'auth'
+  })
   const [authMode, setAuthMode] = useState('login')
   const [credentials, setCredentials] = useState(EMPTY_CREDENTIALS)
+  const [forgotEmail, setForgotEmail] = useState('')
+  const [resetForm, setResetForm] = useState(() => ({ ...EMPTY_RESET, token: getResetTokenFromUrl() }))
+  const [resetPreviewLink, setResetPreviewLink] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
   const [notice, setNotice] = useState(null)
   const [isBootstrapping, setIsBootstrapping] = useState(Boolean(window.localStorage.getItem('proshare_token')))
@@ -131,6 +149,12 @@ function App() {
   useEffect(() => {
     if (token) window.localStorage.setItem('proshare_token', token)
     else window.localStorage.removeItem('proshare_token')
+  }, [token])
+
+  useEffect(() => {
+    const urlToken = getResetTokenFromUrl()
+    setResetForm((current) => ({ ...current, token: urlToken || current.token }))
+    if (!token && urlToken) setPage('reset-password')
   }, [token])
 
   useEffect(() => {
@@ -244,6 +268,57 @@ function App() {
       setCredentials(EMPTY_CREDENTIALS)
       setPage('explore')
       setNotice({ type: 'success', text: authMode === 'login' ? 'Welcome back.' : 'Account created. You are now signed in.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function submitForgotPassword(event) {
+    event.preventDefault()
+    setNotice(null)
+    if (!forgotEmail.trim()) {
+      setNotice({ type: 'error', text: 'Enter the email you used for this account.' })
+      return
+    }
+
+    setIsBusy(true)
+    try {
+      const result = await api('/auth/forgot-password', 'POST', '', { email: forgotEmail.trim() })
+      setResetPreviewLink(result.reset_url || '')
+      setNotice({ type: 'success', text: result.message })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
+  }
+
+  async function submitResetPassword(event) {
+    event.preventDefault()
+    setNotice(null)
+    if (!resetForm.token.trim()) {
+      setNotice({ type: 'error', text: 'Open a valid reset link or paste a reset token.' })
+      return
+    }
+    if (resetForm.newPassword.length < 8) {
+      setNotice({ type: 'error', text: 'Your new password must be at least 8 characters.' })
+      return
+    }
+    if (resetForm.newPassword !== resetForm.confirmPassword) {
+      setNotice({ type: 'error', text: 'The two password fields must match.' })
+      return
+    }
+
+    setIsBusy(true)
+    try {
+      await api('/auth/reset-password', 'POST', '', { token: resetForm.token.trim(), new_password: resetForm.newPassword })
+      setResetForm({ ...EMPTY_RESET })
+      syncResetTokenInUrl('')
+      setPage('auth')
+      setAuthMode('login')
+      setNotice({ type: 'success', text: 'Password updated. You can now sign in with your new password.' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
     } finally {
@@ -392,25 +467,123 @@ function App() {
         <section className="pageSurface authHero">
           <p className="eyebrow">Professional Knowledge, Better Presented</p>
           <h1>ProShare</h1>
-          <p className="authLead">Explore a cleaner publishing flow: read community articles, write in a focused editor, and use AI summaries when you want the fast version.</p>
-          <div className="featurePills"><span>Separate login and registration</span><span>Community article feed</span><span>Editable drafts and published posts</span></div>
+          <p className="authLead">
+            {page === 'forgot-password'
+              ? 'Request a secure password reset link and get back into your writing space without losing momentum.'
+              : page === 'reset-password'
+                ? 'Choose a new password and return to the workspace with a clean, secure sign-in.'
+                : 'Explore a cleaner publishing flow: read community articles, write in a focused editor, and use AI summaries when you want the fast version.'}
+          </p>
+          <div className="featurePills">
+            {page === 'forgot-password' || page === 'reset-password'
+              ? <><span>Private reset tokens</span><span>One-step password renewal</span><span>Same polished workspace feel</span></>
+              : <><span>Separate login and registration</span><span>Community article feed</span><span>Editable drafts and published posts</span></>}
+          </div>
         </section>
         <section className="pageSurface authPanel">
-          <div className="panelHeader">
-            <p className="eyebrow">Access Your Workspace</p>
-            <div className="modeSwitch">
-              <button type="button" className={`modeButton ${authMode === 'login' ? 'active' : ''}`} onClick={() => setAuthMode('login')}>Login</button>
-              <button type="button" className={`modeButton ${authMode === 'register' ? 'active' : ''}`} onClick={() => setAuthMode('register')}>Register</button>
-            </div>
-          </div>
-          <form className="authForm" onSubmit={submitAuth}>
-            <label><span>Email</span><input value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="you@example.com" /></label>
-            {authMode === 'register' && (
-              <label><span>Username</span><input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Choose a public handle" /></label>
-            )}
-            <label><span>Password</span><input type="password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="At least 8 characters" /></label>
-            <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Please wait...' : authMode === 'login' ? 'Sign In' : 'Create Account'}</button>
-          </form>
+          {page === 'auth' && (
+            <>
+              <div className="panelHeader">
+                <p className="eyebrow">Access Your Workspace</p>
+                <div className="modeSwitch">
+                  <button type="button" className={`modeButton ${authMode === 'login' ? 'active' : ''}`} onClick={() => setAuthMode('login')}>Login</button>
+                  <button type="button" className={`modeButton ${authMode === 'register' ? 'active' : ''}`} onClick={() => setAuthMode('register')}>Register</button>
+                </div>
+              </div>
+              <form className="authForm" onSubmit={submitAuth}>
+                <label><span>Email</span><input value={credentials.email} onChange={(event) => setCredentials({ ...credentials, email: event.target.value })} placeholder="you@example.com" /></label>
+                {authMode === 'register' && (
+                  <label><span>Username</span><input value={credentials.username} onChange={(event) => setCredentials({ ...credentials, username: event.target.value })} placeholder="Choose a public handle" /></label>
+                )}
+                <label><span>Password</span><input type="password" value={credentials.password} onChange={(event) => setCredentials({ ...credentials, password: event.target.value })} placeholder="At least 8 characters" /></label>
+                <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Please wait...' : authMode === 'login' ? 'Sign In' : 'Create Account'}</button>
+              </form>
+              {authMode === 'login' && (
+                <button
+                  type="button"
+                  className="textButton"
+                  onClick={() => {
+                    setForgotEmail(credentials.email)
+                    setResetPreviewLink('')
+                    setPage('forgot-password')
+                  }}
+                >
+                  Forgot password?
+                </button>
+              )}
+            </>
+          )}
+
+          {page === 'forgot-password' && (
+            <>
+              <div className="panelHeader">
+                <div>
+                  <p className="eyebrow">Password Recovery</p>
+                  <h3>Request a reset link</h3>
+                </div>
+                <button type="button" className="ghostButton compactButton" onClick={() => { setPage('auth'); setResetPreviewLink('') }}>Back To Login</button>
+              </div>
+              <form className="authForm" onSubmit={submitForgotPassword}>
+                <label><span>Email</span><input value={forgotEmail} onChange={(event) => setForgotEmail(event.target.value)} placeholder="you@example.com" /></label>
+                <button type="submit" className="primaryButton wideButton" disabled={isBusy}>{isBusy ? 'Preparing link...' : 'Send Reset Link'}</button>
+              </form>
+              <p className="subtleMessage">
+                {resetPreviewLink
+                  ? 'SMTP is not configured yet, so this build shows the secure reset link here for development.'
+                  : 'If the email exists in ProShare, a secure reset link will be delivered to that inbox.'}
+              </p>
+              {resetPreviewLink && (
+                <div className="resetPreview">
+                  <p className="eyebrow">Development Preview</p>
+                  <p className="subtleMessage">Open the generated link to continue to the reset screen.</p>
+                  <button
+                    type="button"
+                    className="secondaryButton wideButton"
+                    onClick={() => {
+                      const tokenFromLink = new URL(resetPreviewLink).searchParams.get('reset_token') || ''
+                      setResetForm({ ...EMPTY_RESET, token: tokenFromLink })
+                      syncResetTokenInUrl(tokenFromLink)
+                      setPage('reset-password')
+                    }}
+                  >
+                    Open Reset Link
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {page === 'reset-password' && (
+            <>
+              <div className="panelHeader">
+                <div>
+                  <p className="eyebrow">Secure Reset</p>
+                  <h3>Set a new password</h3>
+                </div>
+                <button
+                  type="button"
+                  className="ghostButton compactButton"
+                  onClick={() => {
+                    setPage('auth')
+                    setResetForm({ ...EMPTY_RESET })
+                    syncResetTokenInUrl('')
+                  }}
+                >
+                  Back To Login
+                </button>
+              </div>
+              <form className="authForm" onSubmit={submitResetPassword}>
+                {!resetForm.token && (
+                  <div className="notice notice-error">
+                    This reset link is missing or invalid. Request a new password reset email to continue.
+                  </div>
+                )}
+                <label><span>New Password</span><input type="password" value={resetForm.newPassword} onChange={(event) => setResetForm({ ...resetForm, newPassword: event.target.value })} placeholder="At least 8 characters" /></label>
+                <label><span>Confirm New Password</span><input type="password" value={resetForm.confirmPassword} onChange={(event) => setResetForm({ ...resetForm, confirmPassword: event.target.value })} placeholder="Re-enter your new password" /></label>
+                <button type="submit" className="primaryButton wideButton" disabled={isBusy || !resetForm.token}>{isBusy ? 'Updating password...' : 'Save New Password'}</button>
+              </form>
+            </>
+          )}
           {notice && <div className={`notice notice-${notice.type}`}>{notice.text}</div>}
         </section>
       </div>
