@@ -870,7 +870,7 @@ function App() {
               </form>
             </section>
             {exploreArticles.length ? (
-              <section className="articleGrid">
+              <section className="articleGrid singleColumn">
                 {exploreArticles.map((article) => (
                   <ArticleCard
                     key={article.id}
