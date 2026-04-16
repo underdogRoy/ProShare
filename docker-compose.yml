@@ -79,6 +79,7 @@ services:
       SUMMARY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_summary
       REDIS_URL: redis://redis:6379/0
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
