@@ -126,6 +126,21 @@ def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(g
     )
 
 
+@app.get("/articles/by-author/{author_id}")
+def public_articles_by_author(author_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    del user_id
+    return (
+        db.query(Article)
+        .filter(
+            Article.author_id == author_id,
+            Article.status == "published",
+            Article.hidden.is_(False),
+        )
+        .order_by(desc(Article.updated_at))
+        .all()
+    )
+
+
 @app.get("/articles/{article_id}")
 def get_article(article_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
     article = (

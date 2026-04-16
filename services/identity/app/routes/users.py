@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..deps import current_user, get_db
@@ -41,3 +41,17 @@ def update_profile(payload: ProfileIn, user: User = Depends(current_user), db: S
     user.links = payload.links
     db.commit()
     return {"ok": True}
+
+
+@router.get("/{user_id}")
+def get_public_profile(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Not found")
+    return {
+        "id": user.id,
+        "username": user.username,
+        "bio": user.bio,
+        "expertise_tags": user.expertise_tags,
+        "links": user.links,
+    }

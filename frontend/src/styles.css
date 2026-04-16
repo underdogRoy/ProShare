@@ -535,6 +535,24 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   font-weight: 600;
   color: #a25a38;
 }
+.authorLinkButton {
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  box-shadow: none;
+  text-decoration: underline;
+  text-decoration-color: rgba(162, 90, 56, 0.45);
+  text-underline-offset: 0.14em;
+}
+.authorLinkButton:hover {
+  transform: none;
+  color: #7c2614;
+}
+.inlineAuthorLink {
+  display: inline;
+}
 .articleExcerpt { color: #4f5b68; }
 .articleStatRow {
   display: flex;

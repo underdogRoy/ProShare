@@ -120,7 +120,7 @@ function EmptyState({ title, text, actionLabel, onAction }) {
   )
 }
 
-function ArticleCard({ article, onOpen, onEdit, onDelete, showEdit, authorName }) {
+function ArticleCard({ article, onOpen, onEdit, onDelete, showEdit, authorName, onAuthorClick }) {
   return (
     <article className="pageSurface articleCard" onClick={() => onOpen(article.id)}>
       <div className="articleCardTop">
@@ -128,7 +128,23 @@ function ArticleCard({ article, onOpen, onEdit, onDelete, showEdit, authorName }
         <span className="metaText">{readingTime(article.content)}</span>
       </div>
       <h3>{article.title}</h3>
-      {authorName && <span className="articleAuthor">by {authorName}</span>}
+      {authorName && (
+        <span className="articleAuthor">
+          by{' '}
+          {onAuthorClick ? (
+            <button
+              type="button"
+              className="authorLinkButton"
+              onClick={(event) => {
+                event.stopPropagation()
+                onAuthorClick(article)
+              }}
+            >
+              {authorName}
+            </button>
+          ) : authorName}
+        </span>
+      )}
       <p className="articleExcerpt">{excerpt(article.content)}</p>
       <div className="tagRow">
         {(article.tags || 'untagged').split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => (
@@ -182,6 +198,8 @@ function App() {
   const [resetForm, setResetForm] = useState(() => ({ ...EMPTY_RESET, token: getResetTokenFromUrl() }))
   const [resetPreviewLink, setResetPreviewLink] = useState('')
   const [currentUser, setCurrentUser] = useState(null)
+  const [viewedProfile, setViewedProfile] = useState(null)
+  const [viewedProfileArticles, setViewedProfileArticles] = useState([])
   const [profileDraft, setProfileDraft] = useState(EMPTY_PROFILE)
   const [profileTagDraft, setProfileTagDraft] = useState('')
   const [notice, setNotice] = useState(null)
@@ -404,6 +422,30 @@ function App() {
     setFeedbackMessage('')
     setArticleReturnTo(returnTo)
     setPage('article')
+  }
+
+  async function openAuthorProfile(article) {
+    if (!article?.author_id) return
+    if (article.author_id === currentUser?.id) {
+      setPage('profile')
+      return
+    }
+
+    setNotice(null)
+    setIsBusy(true)
+    try {
+      const [profile, articles] = await Promise.all([
+        api(`/users/${article.author_id}`, 'GET', token),
+        api(`/articles/by-author/${article.author_id}`, 'GET', token),
+      ])
+      setViewedProfile(profile)
+      setViewedProfileArticles(Array.isArray(articles) ? articles : [])
+      setPage('public-profile')
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   function startNewArticle() {
@@ -1016,6 +1058,7 @@ function App() {
                         article={article}
                         onOpen={(id) => handleOpenArticle(id, 'explore')}
                         authorName={authorLabel(article, currentUser)}
+                        onAuthorClick={openAuthorProfile}
                       />
                     ))}
                   </section>
@@ -1111,6 +1154,7 @@ function App() {
                     article={article}
                     onOpen={(id) => handleOpenArticle(id, 'likes')}
                     authorName={authorLabel(article, currentUser)}
+                    onAuthorClick={openAuthorProfile}
                   />
                 ))}
               </section>
@@ -1140,6 +1184,7 @@ function App() {
                     article={article}
                     onOpen={(id) => handleOpenArticle(id, 'bookmarks')}
                     authorName={authorLabel(article, currentUser)}
+                    onAuthorClick={openAuthorProfile}
                   />
                 ))}
               </section>
@@ -1268,6 +1313,93 @@ function App() {
               </section>
             ) : (
               <EmptyState title="Your profile is ready for its first article" text="Publish or save a draft and it will appear here as part of your creator portfolio." actionLabel="Write Your First Article" onAction={startNewArticle} />
+            )}
+          </>
+        )}
+
+        {!isBootstrapping && page === 'public-profile' && viewedProfile && (
+          <>
+            <section className="pageSurface pageHeader profilePageHeader">
+              <div>
+                <p className="eyebrow">Community Profile</p>
+                <h2>@{viewedProfile.username}</h2>
+                <p>Read this writer&apos;s background, expertise, and published work without leaving the ProShare reading flow.</p>
+              </div>
+              <div className="profileHeaderAside">
+                <div className="statGrid">
+                  <div className="statCard"><strong>{viewedProfileArticles.length}</strong><span>Published Pieces</span></div>
+                  <div className="statCard"><strong>{parseTags(viewedProfile.expertise_tags || '').length || 0}</strong><span>Expertise Tags</span></div>
+                </div>
+                <div className="toolbar profileHeaderToolbar">
+                  <button type="button" className="ghostButton compactButton" onClick={() => setPage('explore')}>Back To Explore</button>
+                </div>
+              </div>
+            </section>
+            <section className="pageSurface profileOverview">
+              <div className="panelHeader">
+                <div>
+                  <p className="eyebrow">About This Writer</p>
+                  <h3>Professional snapshot</h3>
+                </div>
+              </div>
+              <div className="profileFactGrid">
+                <div className="statCard">
+                  <strong>{viewedProfile.username}</strong>
+                  <span>Username</span>
+                </div>
+                <div className="statCard">
+                  <strong>{parseTags(viewedProfile.expertise_tags || '').length || 0}</strong>
+                  <span>Expertise Tags</span>
+                </div>
+                <div className="statCard">
+                  <strong>{viewedProfileArticles.length}</strong>
+                  <span>Published Articles</span>
+                </div>
+                <div className="statCard">
+                  <strong>{viewedProfile.links ? 'Yes' : 'No'}</strong>
+                  <span>Portfolio Link</span>
+                </div>
+              </div>
+              <div className="profileCopy">
+                <h4>Bio</h4>
+                <p>{viewedProfile.bio || 'This writer has not added a bio yet.'}</p>
+              </div>
+              <div className="profileCopy">
+                <h4>Expertise</h4>
+                <div className="tagRow">
+                  {parseTags(viewedProfile.expertise_tags || '').length
+                    ? parseTags(viewedProfile.expertise_tags || '').map((tag) => (
+                      <span key={tag} className="tagChip">{tag}</span>
+                    ))
+                    : <span className="metaText">No expertise tags yet.</span>}
+                </div>
+              </div>
+              <div className="profileCopy">
+                <h4>Links</h4>
+                <p>{viewedProfile.links || 'No public links shared yet.'}</p>
+              </div>
+            </section>
+            <section className="pageSurface pageHeader portfolioHeader">
+              <div>
+                <p className="eyebrow">Published Writing</p>
+                <h2>Browse this writer&apos;s published work</h2>
+                <p>These are the public articles currently available from this author.</p>
+              </div>
+            </section>
+            {viewedProfileArticles.length ? (
+              <section className="articleGrid portfolioGrid">
+                {viewedProfileArticles.map((article) => (
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    onOpen={(id) => handleOpenArticle(id, 'public-profile')}
+                    authorName={`@${viewedProfile.username}`}
+                    onAuthorClick={openAuthorProfile}
+                  />
+                ))}
+              </section>
+            ) : (
+              <EmptyState title="No published articles yet" text="This writer has not published any visible articles yet." actionLabel="Back To Explore" onAction={() => setPage('explore')} />
             )}
           </>
         )}
@@ -1521,6 +1653,7 @@ function App() {
                     onClick={() => {
                       if (articleReturnTo === 'mine') setPage('mine')
                       else if (articleReturnTo === 'profile') setPage('profile')
+                      else if (articleReturnTo === 'public-profile') setPage('public-profile')
                       else if (articleReturnTo === 'likes') setPage('likes')
                       else if (articleReturnTo === 'bookmarks') setPage('bookmarks')
                       else setPage('explore')
@@ -1529,6 +1662,7 @@ function App() {
                     Back To {
                       articleReturnTo === 'mine' ? 'My Articles'
                       : articleReturnTo === 'profile' ? 'Profile'
+                      : articleReturnTo === 'public-profile' ? 'Writer Profile'
                       : articleReturnTo === 'likes' ? 'Liked Articles'
                       : articleReturnTo === 'bookmarks' ? 'Bookmarks'
                       : 'Explore'
@@ -1546,7 +1680,10 @@ function App() {
                   <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
                   <span className="metaText">{readingTime(selectedArticle.content)}</span>
                   <span className="metaText">
-                    {`Written by ${authorLabel(selectedArticle, currentUser)}`}
+                    Written by{' '}
+                    <button type="button" className="authorLinkButton inlineAuthorLink" onClick={() => openAuthorProfile(selectedArticle)}>
+                      {authorLabel(selectedArticle, currentUser)}
+                    </button>
                   </span>
                 </div>
 
