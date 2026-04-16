@@ -87,6 +87,18 @@ services:
         condition: service_healthy
     ports: ['8004:8000']
 
+  notifications:
+    build:
+      context: .
+      dockerfile: services/notifications/Dockerfile
+    environment:
+      NOTIFICATIONS_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_notifications
+      JWT_SECRET: ${JWT_SECRET:-dev-secret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports: ['8005:8000']
+
   gateway:
     build:
       context: .
@@ -96,7 +108,8 @@ services:
       CONTENT_URL: http://content:8000
       ENGAGEMENT_URL: http://engagement:8000
       SUMMARY_URL: http://summary:8000
-    depends_on: [identity, content, engagement, summary]
+      NOTIFICATIONS_URL: http://notifications:8000
+    depends_on: [identity, content, engagement, summary, notifications]
     ports: ['8000:8000']
 
 volumes:

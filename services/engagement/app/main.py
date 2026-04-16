@@ -117,7 +117,8 @@ def like(article_id: int, user_id: int = Depends(current_user_id), db: Session =
     if not db.query(Like).filter_by(article_id=article_id, user_id=user_id).first():
         db.add(Like(article_id=article_id, user_id=user_id))
         db.commit()
-    return {"ok": True}
+        return {"ok": True, "created": True}
+    return {"ok": True, "created": False}
 
 
 @app.post("/articles/{article_id}/bookmark")
@@ -125,7 +126,8 @@ def bookmark(article_id: int, user_id: int = Depends(current_user_id), db: Sessi
     if not db.query(Bookmark).filter_by(article_id=article_id, user_id=user_id).first():
         db.add(Bookmark(article_id=article_id, user_id=user_id))
         db.commit()
-    return {"ok": True}
+        return {"ok": True, "created": True}
+    return {"ok": True, "created": False}
 
 
 @app.post("/articles/{article_id}/comments")

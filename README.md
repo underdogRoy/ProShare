@@ -12,6 +12,7 @@ Four core backend microservices sit behind a unified API gateway:
 | **Content** | Article creation, editing, deletion, feed, search, admin moderation |
 | **Engagement** | Likes, bookmarks, comments, reports |
 | **Summary** | AI summary generation via Claude API, Redis caching, regenerate throttling, feedback |
+| **Notifications** | In-app notifications for likes, bookmarks, and comments on your articles |
 
 An **API Gateway** exposes a single endpoint to the frontend and orchestrates cross-service workflows (e.g. fetching article content before calling the summary service).
 
@@ -19,15 +20,16 @@ An **API Gateway** exposes a single endpoint to the frontend and orchestrates cr
 
 ```
 services/
-  identity/     Identity microservice
-  content/      Content microservice
-  engagement/   Engagement microservice
-  summary/      AI summary microservice (Claude-powered)
-  gateway/      Unified API gateway
-  shared/       Shared JWT security utilities
-frontend/       React + Vite single-page app
-infra/          Postgres DB bootstrap SQL
-scripts/        Local dev scripts (Windows/PowerShell)
+  identity/       Identity microservice
+  content/        Content microservice
+  engagement/     Engagement microservice
+  summary/        AI summary microservice (Claude-powered)
+  notifications/  Notifications microservice
+  gateway/        Unified API gateway
+  shared/         Shared JWT security utilities
+frontend/         React + Vite single-page app
+infra/            Postgres DB bootstrap SQL
+scripts/          Local dev scripts (Windows/PowerShell)
 ```
 
 ## Quick start (Docker)
@@ -54,6 +56,7 @@ Service ports:
 - Content: `http://localhost:8002`
 - Engagement: `http://localhost:8003`
 - Summary: `http://localhost:8004`
+- Notifications: `http://localhost:8005`
 
 **3. Run the frontend dev server separately:**
 ```bash
@@ -95,6 +98,7 @@ The summary service calls `claude-haiku-4-5-20251001` to generate a TL;DR and ke
 - **Article view** — two-column layout: article body on the left, AI summary panel on the right; engagement stats, report form, and comments below
 - **Profile** — bio, expertise tags, portfolio links, and a writing portfolio view
 - **Admin** — report review and article moderation (hide, unhide, delete) for admin users
+- **Notifications** — bell icon in the header with an unread badge; shows when someone likes, bookmarks, or comments on your articles; polls every 30 seconds and supports mark-as-read
 
 ## Password Reset Email Setup
 
