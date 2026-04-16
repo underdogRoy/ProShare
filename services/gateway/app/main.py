@@ -59,6 +59,26 @@ async def users_proxy(path: str, request: Request):
     return await request_json(request.method, f"{IDENTITY}/users/{path}", request=request)
 
 
+async def _fetch_user_articles(engagement_path: str, request: Request) -> list:
+    article_ids = await request_json('GET', engagement_path, request=request)
+    if not article_ids:
+        return []
+    ids_str = ",".join(str(i) for i in article_ids)
+    return await request_json('GET', f"{CONTENT}/articles/batch?ids={ids_str}", request=request)
+
+
+@app.api_route('/me/likes', methods=['GET'])
+async def my_liked_articles(request: Request):
+    limit = request.query_params.get("limit", "0")
+    return await _fetch_user_articles(f"{ENGAGEMENT}/me/likes?limit={limit}", request)
+
+
+@app.api_route('/me/bookmarks', methods=['GET'])
+async def my_bookmarked_articles(request: Request):
+    limit = request.query_params.get("limit", "0")
+    return await _fetch_user_articles(f"{ENGAGEMENT}/me/bookmarks?limit={limit}", request)
+
+
 @app.api_route('/articles', methods=['POST'])
 async def create_article(request: Request):
     return await request_json(request.method, f"{CONTENT}/articles", request=request)

@@ -102,6 +102,20 @@ def update_article(article_id: int, payload: ArticlePatch, user_id: int = Depend
     return article
 
 
+@app.get("/articles/batch")
+def batch_articles(ids: str = Query(""), user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    if not ids:
+        return []
+    id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
+    if not id_list:
+        return []
+    return (
+        db.query(Article)
+        .filter(Article.id.in_(id_list), Article.status == "published", Article.hidden.is_(False))
+        .all()
+    )
+
+
 @app.get("/articles/mine")
 def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
     return (

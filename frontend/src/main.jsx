@@ -178,6 +178,12 @@ function App() {
   const [exploreArticles, setExploreArticles] = useState([])
   const [exploreQuery, setExploreQuery] = useState('')
   const [exploreSort, setExploreSort] = useState('time')
+  const [sidebarLikes, setSidebarLikes] = useState([])
+  const [sidebarBookmarks, setSidebarBookmarks] = useState([])
+  const [sidebarLikesOpen, setSidebarLikesOpen] = useState(true)
+  const [sidebarBookmarksOpen, setSidebarBookmarksOpen] = useState(true)
+  const [allLikedArticles, setAllLikedArticles] = useState([])
+  const [allBookmarkedArticles, setAllBookmarkedArticles] = useState([])
   const [mineArticles, setMineArticles] = useState([])
   const [mineFilter, setMineFilter] = useState('all')
   const [selectedArticle, setSelectedArticle] = useState(null)
@@ -272,7 +278,13 @@ function App() {
     setIsBootstrapping(true)
     async function bootstrap() {
       try {
-        const [profile, recent, mine] = await Promise.all([api('/users/me', 'GET', token), api('/feeds/recent', 'GET', token), api('/articles/mine', 'GET', token)])
+        const [profile, recent, mine, likes, bookmarks] = await Promise.all([
+          api('/users/me', 'GET', token),
+          api('/feeds/recent', 'GET', token),
+          api('/articles/mine', 'GET', token),
+          api('/me/likes?limit=5', 'GET', token).catch(() => []),
+          api('/me/bookmarks?limit=5', 'GET', token).catch(() => []),
+        ])
         if (!active) return
         setCurrentUser(profile)
         setProfileDraft({
@@ -283,6 +295,8 @@ function App() {
         setProfileTagDraft('')
         setExploreArticles(recent)
         setMineArticles(mine)
+        setSidebarLikes(Array.isArray(likes) ? likes : [])
+        setSidebarBookmarks(Array.isArray(bookmarks) ? bookmarks : [])
         setPage((current) => (current === 'auth' ? 'explore' : current))
       } catch (error) {
         if (!active) return
@@ -308,6 +322,29 @@ function App() {
     const data = await api(path, 'GET', token)
     setExploreArticles(data)
     return data
+  }
+
+  async function loadSidebarData() {
+    const [likes, bookmarks] = await Promise.all([
+      api('/me/likes?limit=5', 'GET', token).catch(() => []),
+      api('/me/bookmarks?limit=5', 'GET', token).catch(() => []),
+    ])
+    setSidebarLikes(Array.isArray(likes) ? likes : [])
+    setSidebarBookmarks(Array.isArray(bookmarks) ? bookmarks : [])
+  }
+
+  async function loadAllLikes() {
+    const data = await api('/me/likes', 'GET', token)
+    const articles = Array.isArray(data) ? data : []
+    setAllLikedArticles(articles)
+    return articles
+  }
+
+  async function loadAllBookmarks() {
+    const data = await api('/me/bookmarks', 'GET', token)
+    const articles = Array.isArray(data) ? data : []
+    setAllBookmarkedArticles(articles)
+    return articles
   }
 
   async function loadMine() {
@@ -361,6 +398,10 @@ function App() {
     setEditorMode('create')
     setExploreArticles([])
     setExploreSort('time')
+    setSidebarLikes([])
+    setSidebarBookmarks([])
+    setAllLikedArticles([])
+    setAllBookmarkedArticles([])
     setMineArticles([])
     setSelectedArticle(null)
     setSummary(null)
@@ -526,7 +567,11 @@ function App() {
     setIsBusy(true)
     try {
       await api(`/articles/${selectedArticle.id}/${action}`, 'POST', token)
-      setArticleStats(await api(`/articles/${selectedArticle.id}/stats`, 'GET', token))
+      const [stats] = await Promise.all([
+        api(`/articles/${selectedArticle.id}/stats`, 'GET', token),
+        loadSidebarData(),
+      ])
+      setArticleStats(stats)
       setNotice({ type: 'success', text: action === 'like' ? 'Article liked.' : 'Article bookmarked.' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -897,37 +942,159 @@ function App() {
                 )}
               </form>
             </section>
-            <section className="pageSurface filterBar">
-              <div className="modeSwitch">
-                {[
-                  { value: 'time', label: 'Latest' },
-                  { value: 'likes', label: '&#9829; Most Liked' },
-                  { value: 'comments', label: '&#128172; Most Commented' },
-                  { value: 'bookmarks', label: '&#9733; Most Bookmarked' },
-                ].map(({ value, label }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`modeButton ${exploreSort === value ? 'active' : ''}`}
-                    dangerouslySetInnerHTML={{ __html: label }}
-                    onClick={() => { setExploreSort(value); loadExplore(exploreQuery, value) }}
-                  />
-                ))}
+            <div className="exploreBody">
+              <div className="exploreMain">
+                <section className="pageSurface filterBar">
+                  <div className="modeSwitch">
+                    {[
+                      { value: 'time', label: 'Latest' },
+                      { value: 'likes', label: '&#9829; Most Liked' },
+                      { value: 'comments', label: '&#128172; Most Commented' },
+                      { value: 'bookmarks', label: '&#9733; Most Bookmarked' },
+                    ].map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`modeButton ${exploreSort === value ? 'active' : ''}`}
+                        dangerouslySetInnerHTML={{ __html: label }}
+                        onClick={() => { setExploreSort(value); loadExplore(exploreQuery, value) }}
+                      />
+                    ))}
+                  </div>
+                </section>
+                {exploreArticles.length ? (
+                  <section className="articleGrid singleColumn">
+                    {exploreArticles.map((article) => (
+                      <ArticleCard
+                        key={article.id}
+                        article={article}
+                        onOpen={(id) => handleOpenArticle(id, 'explore')}
+                        authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                      />
+                    ))}
+                  </section>
+                ) : (
+                  <EmptyState title="No articles matched this view" text="Try clearing the search box or publish the first article in the community." actionLabel="Start Writing" onAction={startNewArticle} />
+                )}
               </div>
+
+              <aside className="pageSurface exploreSidebar">
+                <p className="eyebrow" style={{ padding: '1rem 1.25rem 0' }}>My Activity</p>
+                <div className="sidebarSection">
+                  <div className="sidebarSectionHeader">
+                    <button
+                      type="button"
+                      className="sidebarSectionTitle"
+                      onClick={() => { loadAllLikes(); setPage('likes') }}
+                    >
+                      &#9829; Liked Articles
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebarToggle"
+                      onClick={() => setSidebarLikesOpen((o) => !o)}
+                      aria-label={sidebarLikesOpen ? 'Collapse' : 'Expand'}
+                    >
+                      {sidebarLikesOpen ? '▾' : '▸'}
+                    </button>
+                  </div>
+                  {sidebarLikesOpen && (
+                    <ul className="sidebarArticleList">
+                      {sidebarLikes.length ? sidebarLikes.map((article) => (
+                        <li key={article.id}>
+                          <button type="button" className="sidebarArticleButton" onClick={() => handleOpenArticle(article.id, 'explore')}>
+                            {article.title}
+                          </button>
+                        </li>
+                      )) : <li className="sidebarEmpty">No liked articles yet</li>}
+                    </ul>
+                  )}
+                </div>
+                <div className="sidebarSection">
+                  <div className="sidebarSectionHeader">
+                    <button
+                      type="button"
+                      className="sidebarSectionTitle"
+                      onClick={() => { loadAllBookmarks(); setPage('bookmarks') }}
+                    >
+                      &#9733; Bookmarked
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebarToggle"
+                      onClick={() => setSidebarBookmarksOpen((o) => !o)}
+                      aria-label={sidebarBookmarksOpen ? 'Collapse' : 'Expand'}
+                    >
+                      {sidebarBookmarksOpen ? '▾' : '▸'}
+                    </button>
+                  </div>
+                  {sidebarBookmarksOpen && (
+                    <ul className="sidebarArticleList">
+                      {sidebarBookmarks.length ? sidebarBookmarks.map((article) => (
+                        <li key={article.id}>
+                          <button type="button" className="sidebarArticleButton" onClick={() => handleOpenArticle(article.id, 'explore')}>
+                            {article.title}
+                          </button>
+                        </li>
+                      )) : <li className="sidebarEmpty">No bookmarks yet</li>}
+                    </ul>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </>
+        )}
+
+        {!isBootstrapping && page === 'likes' && (
+          <>
+            <section className="pageSurface pageHeader">
+              <div>
+                <p className="eyebrow">Your Engagement</p>
+                <h2>Articles You Liked</h2>
+                <p>All articles you have liked, most recent first.</p>
+              </div>
+              <button type="button" className="ghostButton" onClick={() => setPage('explore')}>Back to Explore</button>
             </section>
-            {exploreArticles.length ? (
+            {allLikedArticles.length ? (
               <section className="articleGrid singleColumn">
-                {exploreArticles.map((article) => (
+                {allLikedArticles.map((article) => (
                   <ArticleCard
                     key={article.id}
                     article={article}
-                    onOpen={(id) => handleOpenArticle(id, 'explore')}
+                    onOpen={(id) => handleOpenArticle(id, 'likes')}
                     authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
                   />
                 ))}
               </section>
             ) : (
-              <EmptyState title="No articles matched this view" text="Try clearing the search box or publish the first article in the community." actionLabel="Start Writing" onAction={startNewArticle} />
+              <EmptyState title="No liked articles yet" text="Like articles while reading to collect them here." actionLabel="Browse Articles" onAction={() => setPage('explore')} />
+            )}
+          </>
+        )}
+
+        {!isBootstrapping && page === 'bookmarks' && (
+          <>
+            <section className="pageSurface pageHeader">
+              <div>
+                <p className="eyebrow">Your Engagement</p>
+                <h2>Bookmarked Articles</h2>
+                <p>All articles you have bookmarked, most recent first.</p>
+              </div>
+              <button type="button" className="ghostButton" onClick={() => setPage('explore')}>Back to Explore</button>
+            </section>
+            {allBookmarkedArticles.length ? (
+              <section className="articleGrid singleColumn">
+                {allBookmarkedArticles.map((article) => (
+                  <ArticleCard
+                    key={article.id}
+                    article={article}
+                    onOpen={(id) => handleOpenArticle(id, 'bookmarks')}
+                    authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                  />
+                ))}
+              </section>
+            ) : (
+              <EmptyState title="No bookmarks yet" text="Bookmark articles while reading to save them here." actionLabel="Browse Articles" onAction={() => setPage('explore')} />
             )}
           </>
         )}
@@ -1301,9 +1468,21 @@ function App() {
                   <button
                     type="button"
                     className="ghostButton"
-                    onClick={() => setPage(articleReturnTo === 'mine' ? 'mine' : articleReturnTo === 'profile' ? 'profile' : 'explore')}
+                    onClick={() => {
+                      if (articleReturnTo === 'mine') setPage('mine')
+                      else if (articleReturnTo === 'profile') setPage('profile')
+                      else if (articleReturnTo === 'likes') setPage('likes')
+                      else if (articleReturnTo === 'bookmarks') setPage('bookmarks')
+                      else setPage('explore')
+                    }}
                   >
-                    Back To {articleReturnTo === 'mine' ? 'My Articles' : articleReturnTo === 'profile' ? 'Profile' : 'Explore'}
+                    Back To {
+                      articleReturnTo === 'mine' ? 'My Articles'
+                      : articleReturnTo === 'profile' ? 'Profile'
+                      : articleReturnTo === 'likes' ? 'Liked Articles'
+                      : articleReturnTo === 'bookmarks' ? 'Bookmarks'
+                      : 'Explore'
+                    }
                   </button>
                   {selectedArticle.author_id === currentUser?.id && (
                     <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>

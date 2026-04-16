@@ -142,6 +142,22 @@ def list_comments(article_id: int, db: Session = Depends(get_db)):
     return db.query(Comment).filter(Comment.article_id == article_id).order_by(Comment.created_at).all()
 
 
+@app.get("/me/likes")
+def my_likes(limit: int = Query(0), user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    q = db.query(Like.article_id).filter(Like.user_id == user_id).order_by(Like.id.desc())
+    if limit > 0:
+        q = q.limit(limit)
+    return [row.article_id for row in q.all()]
+
+
+@app.get("/me/bookmarks")
+def my_bookmarks(limit: int = Query(0), user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    q = db.query(Bookmark.article_id).filter(Bookmark.user_id == user_id).order_by(Bookmark.id.desc())
+    if limit > 0:
+        q = q.limit(limit)
+    return [row.article_id for row in q.all()]
+
+
 @app.get("/articles/batch-stats")
 def batch_stats(ids: str = Query(""), db: Session = Depends(get_db)):
     if not ids:

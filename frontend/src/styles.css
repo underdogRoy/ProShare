@@ -541,6 +541,89 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .articleCardFooter { justify-content: space-between; }
 .cardActions { margin-left: auto; }
 
+/* ── Explore layout with sidebar ── */
+.exploreBody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 272px;
+  gap: 1rem;
+  align-items: start;
+}
+.exploreMain { display: grid; gap: 1rem; }
+
+.exploreSidebar {
+  position: sticky;
+  top: 5.5rem;
+  padding: 0.75rem 0 0.5rem;
+  overflow: hidden;
+}
+.exploreSidebar > .eyebrow {
+  padding: 0 1.25rem 0.5rem;
+}
+.sidebarSection {
+  border-top: 1px solid rgba(31, 53, 81, 0.09);
+}
+.sidebarSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1rem 0.6rem 0.1rem 0;
+}
+.sidebarSectionTitle {
+  flex: 1;
+  padding: 0.65rem 0.6rem 0.65rem 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1f3551;
+  text-align: left;
+  border-radius: 0;
+  transition: color 0.15s;
+}
+.sidebarSectionTitle:hover { color: #c65d3c; }
+.sidebarToggle {
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: #9aa3ae;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.sidebarToggle:hover { background: rgba(31, 53, 81, 0.06); }
+.sidebarArticleList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.4rem;
+}
+.sidebarArticleButton {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 1rem 0.4rem 2rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+  color: #4f5b68;
+  line-height: 1.4;
+  border-radius: 0;
+  transition: background 0.15s, color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sidebarArticleButton:hover { background: rgba(198, 93, 60, 0.07); color: #c65d3c; }
+.sidebarEmpty {
+  padding: 0.35rem 1rem 0.35rem 2rem;
+  font-size: 0.8rem;
+  color: #b0b8c1;
+  font-style: italic;
+}
+
 .statusBadge {
   padding: 0.4rem 0.7rem;
   font-size: 0.8rem;
@@ -825,9 +908,11 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .profileLayout,
   .editorLayout,
   .articleLayout,
+  .exploreBody,
   .topBar {
     grid-template-columns: 1fr;
   }
+  .exploreSidebar { position: static; }
 
   .topBar { justify-items: stretch; }
   .headerActions,
