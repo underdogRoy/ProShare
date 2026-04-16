@@ -59,6 +59,43 @@ async def users_proxy(path: str, request: Request):
     return await request_json(request.method, f"{IDENTITY}/users/{path}", request=request)
 
 
+async def _fetch_user_articles(engagement_path: str, auth_header: str) -> list:
+    headers = {"authorization": auth_header} if auth_header else {}
+    async with httpx.AsyncClient(timeout=20) as client:
+        eng_resp = await client.get(engagement_path, headers=headers)
+    if eng_resp.status_code >= 400:
+        detail = eng_resp.json() if eng_resp.headers.get("content-type", "").startswith("application/json") else {"detail": eng_resp.text}
+        raise HTTPException(status_code=eng_resp.status_code, detail=detail)
+    article_ids = eng_resp.json() if eng_resp.text else []
+    if not article_ids:
+        return []
+    ids_str = ",".join(str(i) for i in article_ids)
+    async with httpx.AsyncClient(timeout=20) as client:
+        content_resp = await client.get(
+            f"{CONTENT}/articles/batch",
+            params={"ids": ids_str},
+            headers=headers,
+        )
+    if content_resp.status_code >= 400:
+        detail = content_resp.json() if content_resp.headers.get("content-type", "").startswith("application/json") else {"detail": content_resp.text}
+        raise HTTPException(status_code=content_resp.status_code, detail=detail)
+    return content_resp.json() if content_resp.text else []
+
+
+@app.api_route('/me/likes', methods=['GET'])
+async def my_liked_articles(request: Request):
+    limit = request.query_params.get("limit", "0")
+    auth = request.headers.get("authorization", "")
+    return await _fetch_user_articles(f"{ENGAGEMENT}/me/likes?limit={limit}", auth)
+
+
+@app.api_route('/me/bookmarks', methods=['GET'])
+async def my_bookmarked_articles(request: Request):
+    limit = request.query_params.get("limit", "0")
+    auth = request.headers.get("authorization", "")
+    return await _fetch_user_articles(f"{ENGAGEMENT}/me/bookmarks?limit={limit}", auth)
+
+
 @app.api_route('/articles', methods=['POST'])
 async def create_article(request: Request):
     return await request_json(request.method, f"{CONTENT}/articles", request=request)
