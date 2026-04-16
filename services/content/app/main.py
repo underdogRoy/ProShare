@@ -126,6 +126,21 @@ def my_articles(user_id: int = Depends(current_user_id), db: Session = Depends(g
     )
 
 
+@app.get("/articles/by-author/{author_id}")
+def public_articles_by_author(author_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    del user_id
+    return (
+        db.query(Article)
+        .filter(
+            Article.author_id == author_id,
+            Article.status == "published",
+            Article.hidden.is_(False),
+        )
+        .order_by(desc(Article.updated_at))
+        .all()
+    )
+
+
 @app.get("/articles/{article_id}")
 def get_article(article_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
     article = (
@@ -210,6 +225,48 @@ def admin_get_article(article_id: int, admin_id: int = Depends(require_admin), d
         "hidden": article.hidden,
         "author_id": article.author_id,
         "updated_at": article.updated_at,
+        "admin_id": admin_id,
+    }
+
+
+@app.get("/admin/articles")
+def admin_list_articles(
+    status: str = Query("all"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    admin_id: int = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Article)
+    if status == "visible":
+        query = query.filter(Article.status != "deleted", Article.hidden.is_(False))
+    elif status == "hidden":
+        query = query.filter(Article.status != "deleted", Article.hidden.is_(True))
+    elif status == "deleted":
+        query = query.filter(Article.status == "deleted")
+
+    total = query.count()
+    items = (
+        query.order_by(desc(Article.updated_at))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": article.id,
+                "title": article.title,
+                "author_id": article.author_id,
+                "status": article.status,
+                "hidden": article.hidden,
+                "updated_at": article.updated_at,
+            }
+            for article in items
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
         "admin_id": admin_id,
     }
 
