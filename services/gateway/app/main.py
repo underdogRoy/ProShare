@@ -63,6 +63,25 @@ async def attach_author_usernames(articles: list[dict]) -> list[dict]:
     return articles
 
 
+async def attach_comment_usernames(comments: list[dict]) -> list[dict]:
+    if not comments:
+        return comments
+
+    user_ids = sorted({comment.get("user_id") for comment in comments if comment.get("user_id") is not None})
+    if not user_ids:
+        return comments
+
+    try:
+        users = await request_json("GET", f"{IDENTITY}/users/batch?ids={','.join(str(user_id) for user_id in user_ids)}")
+    except HTTPException:
+        return comments
+
+    usernames = {user["id"]: user["username"] for user in users if user.get("id") is not None and user.get("username")}
+    for comment in comments:
+        comment["username"] = usernames.get(comment.get("user_id"))
+    return comments
+
+
 @app.get('/health')
 def health():
     return {"ok": True}
@@ -166,7 +185,10 @@ async def engagement_actions(article_id: int, action: str, request: Request):
 
 @app.api_route('/articles/{article_id}/comments', methods=['GET', 'POST'])
 async def article_comments(article_id: int, request: Request):
-    return await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/comments", request=request)
+    payload = await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/comments", request=request)
+    if request.method == "GET" and isinstance(payload, list):
+        return await attach_comment_usernames(payload)
+    return payload
 
 
 @app.api_route('/articles/{article_id}/stats', methods=['GET'])
