@@ -238,9 +238,14 @@ function App() {
   const [editorMode, setEditorMode] = useState('create')
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false)
+  const [notificationsLoading, setNotificationsLoading] = useState(false)
   const debounceRef = useRef(null)
   const quillRef = useRef(null)
   const imageInputRef = useRef(null)
+  const notificationBellRef = useRef(null)
 
   function handleImageUpload(event) {
     const file = event.target.files[0]
@@ -305,6 +310,37 @@ function App() {
     const timeoutId = window.setTimeout(() => setNotice(null), 4000)
     return () => window.clearTimeout(timeoutId)
   }, [notice])
+
+  useEffect(() => {
+    if (!token) {
+      setUnreadCount(0)
+      return undefined
+    }
+    let active = true
+    async function fetchUnreadCount() {
+      try {
+        const data = await api('/notifications/unread-count', 'GET', token)
+        if (active) setUnreadCount(data.count || 0)
+      } catch {}
+    }
+    fetchUnreadCount()
+    const interval = setInterval(fetchUnreadCount, 30000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!showNotificationsPanel) return undefined
+    function handleClickOutside(event) {
+      if (notificationBellRef.current && !notificationBellRef.current.contains(event.target)) {
+        setShowNotificationsPanel(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNotificationsPanel])
 
   useEffect(() => {
     if (!token) {
@@ -517,8 +553,58 @@ function App() {
     setModerationReports([])
     setArticleStats(null)
     setFeedbackMessage('')
+    setNotifications([])
+    setUnreadCount(0)
+    setShowNotificationsPanel(false)
     setPage('auth')
     setNotice({ type: 'success', text: 'You have been signed out.' })
+  }
+
+  function notificationText(n) {
+    const actor = n.actor_username ? `@${n.actor_username}` : 'Someone'
+    const title = n.article_title ? `"${n.article_title}"` : 'your article'
+    if (n.type === 'like') return `${actor} liked ${title}`
+    if (n.type === 'bookmark') return `${actor} bookmarked ${title}`
+    if (n.type === 'comment') return `${actor} commented on ${title}`
+    return `${actor} interacted with ${title}`
+  }
+
+  async function loadNotifications() {
+    setNotificationsLoading(true)
+    try {
+      const data = await api('/notifications', 'GET', token)
+      setNotifications(Array.isArray(data) ? data : [])
+    } catch {}
+    finally {
+      setNotificationsLoading(false)
+    }
+  }
+
+  async function toggleNotificationsPanel() {
+    if (!showNotificationsPanel) {
+      await loadNotifications()
+    }
+    setShowNotificationsPanel((prev) => !prev)
+  }
+
+  async function handleOpenNotification(notification) {
+    try {
+      if (!notification.read) {
+        await api(`/notifications/${notification.id}/read`, 'PATCH', token)
+        setUnreadCount((prev) => Math.max(0, prev - 1))
+        setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)))
+      }
+    } catch {}
+    setShowNotificationsPanel(false)
+    await handleOpenArticle(notification.article_id, 'explore')
+  }
+
+  async function markAllNotificationsRead() {
+    try {
+      await api('/notifications/read-all', 'PATCH', token)
+      setUnreadCount(0)
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
+    } catch {}
   }
 
   async function submitAuth(event) {
@@ -1022,6 +1108,47 @@ function App() {
         </nav>
         <div className="headerActions">
           <div className="userSummary"><strong>{currentUser?.username || 'Writer'}</strong><span>{currentUser?.email || ''}</span></div>
+          <div className="notificationBell" ref={notificationBellRef}>
+            <button
+              type="button"
+              className="notificationBellButton"
+              onClick={toggleNotificationsPanel}
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            >
+              &#128276;
+              {unreadCount > 0 && (
+                <span className="notificationBadge">{unreadCount > 99 ? '99+' : unreadCount}</span>
+              )}
+            </button>
+            {showNotificationsPanel && (
+              <div className="notificationsDropdown">
+                <div className="notificationsDropdownHeader">
+                  <strong>Notifications</strong>
+                  {notifications.some((n) => !n.read) && (
+                    <button type="button" className="textButton" onClick={markAllNotificationsRead}>
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                {notificationsLoading ? (
+                  <p className="notificationsEmpty">Loading...</p>
+                ) : notifications.length ? (
+                  <ul className="notificationsList">
+                    {notifications.map((n) => (
+                      <li key={n.id} className={`notificationItem${n.read ? '' : ' unread'}`}>
+                        <button type="button" className="notificationItemButton" onClick={() => handleOpenNotification(n)}>
+                          <span className="notificationText">{notificationText(n)}</span>
+                          <span className="notificationTime">{formatDate(n.created_at)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="notificationsEmpty">No notifications yet</p>
+                )}
+              </div>
+            )}
+          </div>
           <button type="button" className="ghostButton" onClick={logout}>Log Out</button>
         </div>
       </header>
