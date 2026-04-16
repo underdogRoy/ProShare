@@ -1519,7 +1519,11 @@ function App() {
                   <StatusBadge status={selectedArticle.status} />
                   <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
                   <span className="metaText">{readingTime(selectedArticle.content)}</span>
-                  <span className="metaText">Author #{selectedArticle.author_id}</span>
+                  <span className="metaText">
+                    {selectedArticle.author_id === currentUser?.id
+                      ? `Written by @${currentUser.username}`
+                      : `Written by User #${selectedArticle.author_id}`}
+                  </span>
                 </div>
 
                 <h2>{selectedArticle.title}</h2>
