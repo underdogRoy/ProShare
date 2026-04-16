@@ -678,7 +678,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 
 .articleLayout {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  grid-template-columns: 1fr;
   gap: 1rem;
 }
 
@@ -714,11 +714,6 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 }
 .articleBody .ql-editor p {
   margin-bottom: 1em;
-}
-.articleSidebar {
-  display: grid;
-  gap: 1rem;
-  align-self: start;
 }
 .stackedActions { flex-direction: column; align-items: stretch; }
 .stackedActions > * { width: 100%; }
@@ -839,7 +834,6 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .userSummary { text-align: left; }
   .profileTagEditor { grid-template-columns: 1fr; }
   .profileHeaderToolbar { justify-content: flex-start; }
-  .articleSidebar { position: static; }
   .authPanelHeader {
     align-items: flex-start;
   }
