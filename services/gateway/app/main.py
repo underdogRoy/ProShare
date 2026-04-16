@@ -114,6 +114,35 @@ async def articles_proxy(path: str, request: Request):
     return await request_json(request.method, f"{CONTENT}/articles/{path}", request=request)
 
 
+async def _enrich_and_sort(articles: list, sort: str) -> list:
+    if not articles:
+        return articles
+    ids = ",".join(str(a["id"]) for a in articles)
+    try:
+        stats_map = await request_json('GET', f"{ENGAGEMENT}/articles/batch-stats?ids={ids}")
+    except Exception:
+        stats_map = {}
+    for article in articles:
+        s = stats_map.get(str(article["id"]), {})
+        article["like_count"] = s.get("like_count", 0)
+        article["comment_count"] = s.get("comment_count", 0)
+        article["bookmark_count"] = s.get("bookmark_count", 0)
+    if sort == "likes":
+        articles.sort(key=lambda a: a["like_count"], reverse=True)
+    elif sort == "comments":
+        articles.sort(key=lambda a: a["comment_count"], reverse=True)
+    elif sort == "bookmarks":
+        articles.sort(key=lambda a: a["bookmark_count"], reverse=True)
+    return articles
+
+
+@app.api_route('/feeds/recent', methods=['GET'])
+async def feeds_recent(request: Request):
+    sort = request.query_params.get("sort", "time")
+    articles = await request_json('GET', f"{CONTENT}/feeds/recent", request=request)
+    return await _enrich_and_sort(articles, sort)
+
+
 @app.api_route('/feeds/{path:path}', methods=['GET'])
 async def feeds_proxy(path: str, request: Request):
     return await request_json('GET', f"{CONTENT}/feeds/{path}", request=request)
@@ -121,7 +150,9 @@ async def feeds_proxy(path: str, request: Request):
 
 @app.api_route('/search', methods=['GET'])
 async def search_proxy(request: Request):
-    return await request_json('GET', f"{CONTENT}/search", request=request)
+    sort = request.query_params.get("sort", "time")
+    articles = await request_json('GET', f"{CONTENT}/search", request=request)
+    return await _enrich_and_sort(articles, sort)
 
 
 @app.api_route('/reports', methods=['POST'])
