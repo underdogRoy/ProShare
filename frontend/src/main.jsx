@@ -187,6 +187,22 @@ function App() {
   const [suggestions, setSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef(null)
+  const quillRef = useRef(null)
+  const imageInputRef = useRef(null)
+
+  function handleImageUpload(event) {
+    const file = event.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const quill = quillRef.current.getEditor()
+      const range = quill.getSelection(true)
+      quill.insertEmbed(range.index, 'image', e.target.result)
+      quill.setSelection(range.index + 1)
+    }
+    reader.readAsDataURL(file)
+    event.target.value = ''
+  }
 
   function handleSearchInput(value) {
     setExploreQuery(value)
@@ -1089,6 +1105,7 @@ function App() {
               <div className="richEditorWrapper">
                 <span className="richEditorLabel">Content</span>
                 <ReactQuill
+                  ref={quillRef}
                   theme="snow"
                   value={editor.content}
                   onChange={(value) => setEditor({ ...editor, content: value })}
@@ -1103,6 +1120,24 @@ function App() {
                     ],
                   }}
                 />
+              </div>
+              <div className="imageUploadRow">
+                <span className="richEditorLabel">Image</span>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleImageUpload}
+                />
+                <button
+                  type="button"
+                  className="ghostButton compactButton"
+                  onClick={() => imageInputRef.current.click()}
+                >
+                  Upload Image
+                </button>
+                <span className="metaText">Image will be inserted at the cursor position</span>
               </div>
               <div className="editorActions">
                 <button type="submit" className="primaryButton" disabled={isBusy}>
