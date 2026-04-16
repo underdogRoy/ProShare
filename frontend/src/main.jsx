@@ -184,6 +184,8 @@ function App() {
   const [sidebarBookmarksOpen, setSidebarBookmarksOpen] = useState(true)
   const [allLikedArticles, setAllLikedArticles] = useState([])
   const [allBookmarkedArticles, setAllBookmarkedArticles] = useState([])
+  const [likesLoading, setLikesLoading] = useState(false)
+  const [bookmarksLoading, setBookmarksLoading] = useState(false)
   const [mineArticles, setMineArticles] = useState([])
   const [mineFilter, setMineFilter] = useState('all')
   const [selectedArticle, setSelectedArticle] = useState(null)
@@ -334,17 +336,33 @@ function App() {
   }
 
   async function loadAllLikes() {
-    const data = await api('/me/likes', 'GET', token)
-    const articles = Array.isArray(data) ? data : []
-    setAllLikedArticles(articles)
-    return articles
+    setLikesLoading(true)
+    try {
+      const data = await api('/me/likes', 'GET', token)
+      const articles = Array.isArray(data) ? data : []
+      setAllLikedArticles(articles)
+      return articles
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+      return []
+    } finally {
+      setLikesLoading(false)
+    }
   }
 
   async function loadAllBookmarks() {
-    const data = await api('/me/bookmarks', 'GET', token)
-    const articles = Array.isArray(data) ? data : []
-    setAllBookmarkedArticles(articles)
-    return articles
+    setBookmarksLoading(true)
+    try {
+      const data = await api('/me/bookmarks', 'GET', token)
+      const articles = Array.isArray(data) ? data : []
+      setAllBookmarkedArticles(articles)
+      return articles
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+      return []
+    } finally {
+      setBookmarksLoading(false)
+    }
   }
 
   async function loadMine() {
@@ -402,6 +420,8 @@ function App() {
     setSidebarBookmarks([])
     setAllLikedArticles([])
     setAllBookmarkedArticles([])
+    setLikesLoading(false)
+    setBookmarksLoading(false)
     setMineArticles([])
     setSelectedArticle(null)
     setSummary(null)
@@ -985,7 +1005,7 @@ function App() {
                     <button
                       type="button"
                       className="sidebarSectionTitle"
-                      onClick={() => { loadAllLikes(); setPage('likes') }}
+                      onClick={() => { setPage('likes'); loadAllLikes() }}
                     >
                       &#9829; Liked Articles
                     </button>
@@ -1015,7 +1035,7 @@ function App() {
                     <button
                       type="button"
                       className="sidebarSectionTitle"
-                      onClick={() => { loadAllBookmarks(); setPage('bookmarks') }}
+                      onClick={() => { setPage('bookmarks'); loadAllBookmarks() }}
                     >
                       &#9733; Bookmarked
                     </button>
@@ -1055,7 +1075,9 @@ function App() {
               </div>
               <button type="button" className="ghostButton" onClick={() => setPage('explore')}>Back to Explore</button>
             </section>
-            {allLikedArticles.length ? (
+            {likesLoading ? (
+              <div className="pageSurface loadingPanel">Loading liked articles...</div>
+            ) : allLikedArticles.length ? (
               <section className="articleGrid singleColumn">
                 {allLikedArticles.map((article) => (
                   <ArticleCard
@@ -1082,7 +1104,9 @@ function App() {
               </div>
               <button type="button" className="ghostButton" onClick={() => setPage('explore')}>Back to Explore</button>
             </section>
-            {allBookmarkedArticles.length ? (
+            {bookmarksLoading ? (
+              <div className="pageSurface loadingPanel">Loading bookmarked articles...</div>
+            ) : allBookmarkedArticles.length ? (
               <section className="articleGrid singleColumn">
                 {allBookmarkedArticles.map((article) => (
                   <ArticleCard
