@@ -1,88 +1,103 @@
-# ProShare (Microservices Refactor)
+# ProShare
 
-This repository is refactored into **4 core microservices** requested in the SRS:
+A professional article-sharing platform built on a microservices architecture. Users can write, publish, and explore articles, engage with the community through likes, bookmarks and comments, and generate AI-powered summaries using the Claude API.
 
-1. **Identity Service** (auth, profile, RBAC)
-2. **Content Service** (article lifecycle, feed, search, moderation hide)
-3. **Engagement Service** (likes, comments, bookmarks, reports)
-4. **AI Summary Service** (summary generation, cache, regenerate rate limit, feedback)
+## Architecture
 
-An **API Gateway** is also provided to expose a unified API to the frontend.
+Four core backend microservices sit behind a unified API gateway:
 
-## Production-oriented capabilities included
-- PostgreSQL-backed persistence per service database.
-- Redis-backed summary cache and regenerate throttling.
-- JWT auth across services.
-- Dockerized services + docker-compose orchestration.
-- Service-level health endpoints.
-- API gateway orchestration for summary workflow (`content -> summary`) and unified frontend access.
+| Service | Responsibility |
+|---|---|
+| **Identity** | Registration, login, JWT auth, password reset, user profiles, RBAC |
+| **Content** | Article creation, editing, deletion, feed, search, admin moderation |
+| **Engagement** | Likes, bookmarks, comments, reports |
+| **Summary** | AI summary generation via Claude API, Redis caching, regenerate throttling, feedback |
+
+An **API Gateway** exposes a single endpoint to the frontend and orchestrates cross-service workflows (e.g. fetching article content before calling the summary service).
 
 ## Repository structure
-- `services/identity` - Identity microservice.
-- `services/content` - Content microservice.
-- `services/engagement` - Engagement microservice.
-- `services/summary` - AI summary microservice.
-- `services/gateway` - Unified API gateway.
-- `services/shared` - Shared security utilities.
-- `frontend/` - React UI.
-- `infra/init-databases.sql` - Postgres DB bootstrapping.
+
+```
+services/
+  identity/     Identity microservice
+  content/      Content microservice
+  engagement/   Engagement microservice
+  summary/      AI summary microservice (Claude-powered)
+  gateway/      Unified API gateway
+  shared/       Shared JWT security utilities
+frontend/       React + Vite single-page app
+infra/          Postgres DB bootstrap SQL
+scripts/        Local dev scripts (Windows/PowerShell)
+```
 
 ## Quick start (Docker)
+
+**1. Copy and fill in your environment file:**
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set at minimum:
+```env
+ANTHROPIC_API_KEY=sk-ant-your-key-here
+```
+
+**2. Start the full stack:**
 ```bash
 docker compose up --build
 ```
 
-Endpoints:
+Service ports:
+- Frontend (dev): `http://localhost:5173`
 - Gateway: `http://localhost:8000`
 - Identity: `http://localhost:8001`
 - Content: `http://localhost:8002`
 - Engagement: `http://localhost:8003`
 - Summary: `http://localhost:8004`
 
-## Quick start (Windows, no Docker)
-This repository now includes a local development mode for Windows:
-
-- Service databases run on local `SQLite` files under `.local-data/`
-- Summary cache falls back to in-memory storage, so local dev does not require Redis
-- You can start the whole stack with PowerShell scripts
-
-Requirements:
-- Python 3.10+
-- Node.js 18+
-- PowerShell
-
-From the repo root:
-
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\scripts\setup-local.ps1
-.\scripts\start-local.ps1
+**3. Run the frontend dev server separately:**
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
-Endpoints in local mode:
-- Gateway: `http://127.0.0.1:8000`
-- Identity: `http://127.0.0.1:8001`
-- Content: `http://127.0.0.1:8002`
-- Engagement: `http://127.0.0.1:8003`
-- Summary: `http://127.0.0.1:8004`
-- Frontend: `http://127.0.0.1:5173`
+By default the frontend calls `http://localhost:8000`. Override with `VITE_API_URL` if needed.
 
-Helpful commands:
+## Environment variables
 
-```powershell
-# Start backend services only
-.\scripts\start-local.ps1 -NoFrontend
+| Variable | Required | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Yes (for AI summaries) | Claude API key for article summarisation |
+| `JWT_SECRET` | Recommended | Secret used to sign JWT tokens. Defaults to `dev-secret` |
+| `PASSWORD_RESET_URL_BASE` | No | Frontend base URL used in password reset links |
+| `SMTP_PROVIDER` | No | `gmail` or `outlook` shortcut |
+| `SMTP_HOST`, `SMTP_PORT` | No | Override SMTP server directly |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | No | SMTP login credentials |
+| `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` | No | Sender identity shown to users |
+| `SMTP_USE_TLS`, `SMTP_USE_SSL` | No | Transport security flags |
+| `IDENTITY_SHOW_RESET_LINK` | No | When `true`, returns a dev reset link if SMTP is not configured |
 
-# Stop everything started by the local script
-.\scripts\stop-local.ps1
-```
+## AI Summary (Claude)
 
-Notes:
-- Local SQLite files are created automatically in `.local-data/`
-- Summary cache is in-memory during local mode, so restarting the summary service clears cached summaries
-- The Docker workflow still uses PostgreSQL + Redis as before
+The summary service calls `claude-haiku-4-5-20251001` to generate a TL;DR and key takeaways for any article. Features:
+- HTML and base64 image content is stripped before sending to the model
+- Long articles are split into chunks, each summarised, then combined
+- Results are cached in Redis for one hour (keyed by article content hash)
+- A regenerate option bypasses the cache with a 30-second rate limit per user
+- Falls back to a basic extractive summary if no API key is configured
+
+## Frontend features
+
+- **Explore** — community article feed with search and sort (by time, likes, comments, bookmarks); sidebar showing your recently liked and bookmarked articles
+- **Write** — rich text editor (Quill) with image upload; images are embedded at the cursor position
+- **My Articles** — manage your drafts and published posts; edit or delete your own articles
+- **Article view** — two-column layout: article body on the left, AI summary panel on the right; engagement stats, report form, and comments below
+- **Profile** — bio, expertise tags, portfolio links, and a writing portfolio view
+- **Admin** — report review and article moderation (hide, unhide, delete) for admin users
 
 ## Password Reset Email Setup
+
 The identity service supports real SMTP delivery for password reset emails.
 
 Recommended setup:
@@ -104,15 +119,6 @@ SMTP_USE_SSL=false
 IDENTITY_SHOW_RESET_LINK=false
 ```
 
-Environment variables:
-- `PASSWORD_RESET_URL_BASE` - frontend base URL used in reset links
-- `SMTP_PROVIDER` - optional shortcut such as `gmail` or `outlook`
-- `SMTP_HOST`, `SMTP_PORT` - override SMTP server details directly
-- `SMTP_USERNAME`, `SMTP_PASSWORD` - SMTP login credentials
-- `SMTP_FROM_EMAIL`, `SMTP_FROM_NAME` - sender identity shown to users
-- `SMTP_USE_TLS`, `SMTP_USE_SSL` - transport security flags
-- `IDENTITY_SHOW_RESET_LINK` - when `true`, the API also returns a development reset link if SMTP is not configured
-
 Common presets:
 - Gmail: set `SMTP_PROVIDER=gmail` and use an app password for `SMTP_PASSWORD`
 - Outlook/Hotmail: set `SMTP_PROVIDER=outlook`
@@ -126,19 +132,25 @@ For Gmail:
 If SMTP is not configured, password reset still works in development mode by returning a preview reset link from the identity service.
 
 ## Admin Testing Notes
+
 - Register a normal user account first.
 - In the identity database, update that user's `is_admin` field to `true`.
 - Sign out and sign back in so a fresh token includes admin access.
 - The frontend will then show an `Admin` tab for report review and article moderation.
 
-## Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+## Quick start (Windows, no Docker)
+
+Requirements: Python 3.10+, Node.js 18+, PowerShell
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\setup-local.ps1
+.\scripts\start-local.ps1
 ```
 
-By default frontend calls `http://localhost:8000`, override with `VITE_API_URL`.
+In local mode, services use SQLite under `.local-data/` and the summary cache is in-memory.
 
-## Note about old monolith
-The previous `backend/` folder remains in git history for reference. The active architecture is `services/*` microservices + gateway.
+```powershell
+.\scripts\start-local.ps1 -NoFrontend   # backend only
+.\scripts\stop-local.ps1                # stop everything
+```
