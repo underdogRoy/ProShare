@@ -1953,7 +1953,15 @@ function App() {
                   <div className="commentList">
                     {comments.map((item) => (
                       <article key={item.id} className="commentItem">
-                        <strong>User #{item.user_id}</strong>
+                        <strong>
+                          <button
+                            type="button"
+                            className="authorLinkButton inlineAuthorLink"
+                            onClick={() => openAuthorProfile({ author_id: item.user_id, author_username: item.username })}
+                          >
+                            {item.username ? `@${item.username}` : `User #${item.user_id}`}
+                          </button>
+                        </strong>
                         <span className="metaText">{formatDate(item.created_at)}</span>
                         <p>{item.content}</p>
                       </article>
