@@ -226,7 +226,12 @@ function App() {
   const [reportReason, setReportReason] = useState('')
   const [showReportComposer, setShowReportComposer] = useState(false)
   const [moderationReports, setModerationReports] = useState([])
+  const [adminSection, setAdminSection] = useState('reports')
   const [moderationFilter, setModerationFilter] = useState('open')
+  const [adminArticles, setAdminArticles] = useState([])
+  const [adminArticleFilter, setAdminArticleFilter] = useState('all')
+  const [adminArticlePage, setAdminArticlePage] = useState(1)
+  const [adminArticleTotal, setAdminArticleTotal] = useState(0)
   const [summary, setSummary] = useState(null)
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [editor, setEditor] = useState(EMPTY_EDITOR)
@@ -405,6 +410,18 @@ function App() {
   async function loadModerationReports(filter = moderationFilter) {
     const data = await api(`/admin/reports?status=${encodeURIComponent(filter)}`, 'GET', token)
     setModerationReports(data)
+    return data
+  }
+
+  async function loadAdminArticles(filter = adminArticleFilter, pageNumber = adminArticlePage) {
+    const data = await api(
+      `/admin/articles?status=${encodeURIComponent(filter)}&page=${pageNumber}&page_size=20`,
+      'GET',
+      token,
+    )
+    setAdminArticles(Array.isArray(data.items) ? data.items : [])
+    setAdminArticleTotal(data.total || 0)
+    setAdminArticlePage(data.page || pageNumber)
     return data
   }
 
@@ -799,10 +816,20 @@ function App() {
     setIsBusy(true)
     try {
       await api(`/admin/articles/${articleId}/${action}`, 'POST', token)
-      await Promise.all([loadModerationReports(moderationFilter), loadExplore(''), loadMine()])
+      await Promise.all([
+        loadModerationReports(moderationFilter),
+        loadAdminArticles(adminArticleFilter, adminArticlePage),
+        loadExplore(''),
+        loadMine(),
+      ])
       if (selectedArticle?.id === articleId) {
-        setPage('admin')
-        setSelectedArticle(null)
+        setSelectedArticle((current) => {
+          if (!current || current.id !== articleId) return current
+          if (action === 'hide') return { ...current, hidden: true }
+          if (action === 'unhide') return { ...current, hidden: false }
+          if (action === 'remove') return { ...current, hidden: true, status: 'deleted' }
+          return current
+        })
       }
       setNotice({
         type: 'success',
@@ -991,7 +1018,7 @@ function App() {
           <button type="button" className={`navButton ${page === 'editor' ? 'active' : ''}`} onClick={startNewArticle}>Write</button>
           <button type="button" className={`navButton ${page === 'mine' ? 'active' : ''}`} onClick={() => { setPage('mine'); refreshMine() }}>My Articles</button>
           <button type="button" className={`navButton ${page === 'profile' ? 'active' : ''}`} onClick={() => setPage('profile')}>Profile</button>
-          {isAdmin && <button type="button" className={`navButton ${page === 'admin' ? 'active' : ''}`} onClick={() => { setPage('admin'); loadModerationReports(moderationFilter) }}>Admin</button>}
+          {isAdmin && <button type="button" className={`navButton ${page === 'admin' ? 'active' : ''}`} onClick={() => { setPage('admin'); loadModerationReports(moderationFilter); loadAdminArticles(adminArticleFilter, adminArticlePage) }}>Admin</button>}
         </nav>
         <div className="headerActions">
           <div className="userSummary"><strong>{currentUser?.username || 'Writer'}</strong><span>{currentUser?.email || ''}</span></div>
@@ -1547,19 +1574,58 @@ function App() {
             <section className="pageSurface pageHeader">
               <div>
                 <p className="eyebrow">Moderation Desk</p>
-                <h2>{moderationFilter === 'open' ? 'Review open reports' : 'Review resolved reports'}</h2>
-                <p>Inspect flagged content, track moderation status, and keep a clean history of actions taken on community reports.</p>
-                
+                <h2>{adminSection === 'reports' ? (moderationFilter === 'open' ? 'Review open reports' : 'Review resolved reports') : 'Manage all articles'}</h2>
+                <p>
+                  {adminSection === 'reports'
+                    ? 'Inspect flagged content, track moderation status, and keep a clean history of actions taken on community reports.'
+                    : 'Browse platform content by status, find hidden posts again, and apply moderation actions without depending on reports.'}
+                </p>
               </div>
               <div className="moderationHeaderActions">
-                <div className="modeSwitch moderationTabs">
-                  <button type="button" className={`modeButton ${moderationFilter === 'open' ? 'active' : ''}`} onClick={() => { setModerationFilter('open'); loadModerationReports('open') }}>Open</button>
-                  <button type="button" className={`modeButton ${moderationFilter === 'resolved' ? 'active' : ''}`} onClick={() => { setModerationFilter('resolved'); loadModerationReports('resolved') }}>Resolved</button>
+                <div className="modeSwitch moderationSections">
+                  <button
+                    type="button"
+                    className={`modeButton ${adminSection === 'reports' ? 'active' : ''}`}
+                    onClick={() => {
+                      setAdminSection('reports')
+                      loadModerationReports(moderationFilter)
+                    }}
+                  >
+                    Reports
+                  </button>
+                  <button
+                    type="button"
+                    className={`modeButton ${adminSection === 'articles' ? 'active' : ''}`}
+                    onClick={() => {
+                      setAdminSection('articles')
+                      loadAdminArticles(adminArticleFilter, adminArticlePage)
+                    }}
+                  >
+                    Articles
+                  </button>
                 </div>
-                <button type="button" className="ghostButton compactButton refreshButton" onClick={() => loadModerationReports(moderationFilter)} disabled={isBusy}>Refresh Reports</button>
+                {adminSection === 'reports' ? (
+                  <>
+                    <div className="modeSwitch moderationTabs">
+                      <button type="button" className={`modeButton ${moderationFilter === 'open' ? 'active' : ''}`} onClick={() => { setModerationFilter('open'); loadModerationReports('open') }}>Open</button>
+                      <button type="button" className={`modeButton ${moderationFilter === 'resolved' ? 'active' : ''}`} onClick={() => { setModerationFilter('resolved'); loadModerationReports('resolved') }}>Resolved</button>
+                    </div>
+                    <button type="button" className="ghostButton compactButton refreshButton" onClick={() => loadModerationReports(moderationFilter)} disabled={isBusy}>Refresh Reports</button>
+                  </>
+                ) : (
+                  <>
+                    <div className="modeSwitch moderationTabs">
+                      <button type="button" className={`modeButton ${adminArticleFilter === 'all' ? 'active' : ''}`} onClick={() => { setAdminArticleFilter('all'); setAdminArticlePage(1); loadAdminArticles('all', 1) }}>All</button>
+                      <button type="button" className={`modeButton ${adminArticleFilter === 'visible' ? 'active' : ''}`} onClick={() => { setAdminArticleFilter('visible'); setAdminArticlePage(1); loadAdminArticles('visible', 1) }}>Visible</button>
+                      <button type="button" className={`modeButton ${adminArticleFilter === 'hidden' ? 'active' : ''}`} onClick={() => { setAdminArticleFilter('hidden'); setAdminArticlePage(1); loadAdminArticles('hidden', 1) }}>Hidden</button>
+                      <button type="button" className={`modeButton ${adminArticleFilter === 'deleted' ? 'active' : ''}`} onClick={() => { setAdminArticleFilter('deleted'); setAdminArticlePage(1); loadAdminArticles('deleted', 1) }}>Deleted</button>
+                    </div>
+                    <button type="button" className="ghostButton compactButton refreshButton" onClick={() => loadAdminArticles(adminArticleFilter, adminArticlePage)} disabled={isBusy}>Refresh Articles</button>
+                  </>
+                )}
               </div>
             </section>
-            {moderationReports.length ? (
+            {adminSection === 'reports' && (moderationReports.length ? (
               <section className="moderationList">
                 {moderationReports.map((report) => (
                   <article key={report.id} className="pageSurface moderationCard">
@@ -1618,6 +1684,81 @@ function App() {
                 title={moderationFilter === 'open' ? 'No open reports to review' : 'No resolved reports yet'}
                 text={moderationFilter === 'open' ? 'Once readers flag content, reports will appear here for moderation.' : 'Resolved moderation actions will be collected here as history.'}
               />
+            ))}
+            {adminSection === 'articles' && (
+              adminArticles.length ? (
+                <section className="pageSurface adminArticleDirectory">
+                  <div className="adminArticleDirectoryHeader">
+                    <span className="metaText">{adminArticleTotal} total articles</span>
+                    <span className="metaText">Page {adminArticlePage}</span>
+                  </div>
+                  <div className="adminArticleList">
+                    {adminArticles.map((article) => (
+                      <article key={article.id} className="adminArticleRow">
+                        <div className="adminArticleMain">
+                          <button type="button" className="adminArticleTitle" onClick={() => handleOpenArticle(article.id, 'admin')}>
+                            {article.title}
+                          </button>
+                          <div className="adminArticleMeta">
+                            <span className="metaText">{article.author_username ? `@${article.author_username}` : `User #${article.author_id}`}</span>
+                            <span className="metaText">{article.status === 'deleted' ? 'Deleted' : article.hidden ? 'Hidden' : 'Visible'}</span>
+                            <span className="metaText">{formatDate(article.updated_at)}</span>
+                          </div>
+                        </div>
+                        <div className="adminArticleActions">
+                          {article.status !== 'deleted' && (
+                            <button type="button" className="ghostButton compactButton" onClick={() => handleOpenArticle(article.id, 'admin')}>Open</button>
+                          )}
+                          {!article.hidden && article.status !== 'deleted' && (
+                            <button type="button" className="primaryButton compactButton" onClick={() => handleModerationAction(article.id, 'hide')} disabled={isBusy}>Hide</button>
+                          )}
+                          {article.hidden && article.status !== 'deleted' && (
+                            <button type="button" className="secondaryButton compactButton" onClick={() => handleModerationAction(article.id, 'unhide')} disabled={isBusy}>Unhide</button>
+                          )}
+                          {article.status !== 'deleted' && (
+                            <button type="button" className="ghostButton compactButton" onClick={() => handleModerationAction(article.id, 'remove')} disabled={isBusy}>Delete</button>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="adminPagination">
+                    <button
+                      type="button"
+                      className="ghostButton compactButton"
+                      onClick={() => {
+                        const nextPage = Math.max(1, adminArticlePage - 1)
+                        setAdminArticlePage(nextPage)
+                        loadAdminArticles(adminArticleFilter, nextPage)
+                      }}
+                      disabled={isBusy || adminArticlePage <= 1}
+                    >
+                      Previous
+                    </button>
+                    <span className="metaText">
+                      {adminArticlePage} / {Math.max(1, Math.ceil(adminArticleTotal / 20))}
+                    </span>
+                    <button
+                      type="button"
+                      className="ghostButton compactButton"
+                      onClick={() => {
+                        const maxPage = Math.max(1, Math.ceil(adminArticleTotal / 20))
+                        const nextPage = Math.min(maxPage, adminArticlePage + 1)
+                        setAdminArticlePage(nextPage)
+                        loadAdminArticles(adminArticleFilter, nextPage)
+                      }}
+                      disabled={isBusy || adminArticlePage >= Math.max(1, Math.ceil(adminArticleTotal / 20))}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </section>
+              ) : (
+                <EmptyState
+                  title="No articles match this filter"
+                  text="Switch the filter to browse visible, hidden, or deleted content."
+                />
+              )
             )}
           </>
         )}
@@ -1654,7 +1795,8 @@ function App() {
                     type="button"
                     className="ghostButton"
                     onClick={() => {
-                      if (articleReturnTo === 'mine') setPage('mine')
+                      if (articleReturnTo === 'admin') setPage('admin')
+                      else if (articleReturnTo === 'mine') setPage('mine')
                       else if (articleReturnTo === 'profile') setPage('profile')
                       else if (articleReturnTo === 'public-profile') setPage('public-profile')
                       else if (articleReturnTo === 'likes') setPage('likes')
@@ -1663,6 +1805,8 @@ function App() {
                     }}
                   >
                     Back To {
+                      articleReturnTo === 'admin' ? 'Admin'
+                      :
                       articleReturnTo === 'mine' ? 'My Articles'
                       : articleReturnTo === 'profile' ? 'Profile'
                       : articleReturnTo === 'public-profile' ? 'Writer Profile'
@@ -1671,11 +1815,39 @@ function App() {
                       : 'Explore'
                     }
                   </button>
-                  {selectedArticle.author_id === currentUser?.id && (
-                    <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>
-                      Edit Article
-                    </button>
-                  )}
+                  <div className="articleHeaderActions">
+                    {isAdmin && (
+                      <div className="adminHeaderControls">
+                        <span className="metaText adminHeaderStatus">
+                          {selectedArticle.status === 'deleted'
+                            ? 'Deleted'
+                            : selectedArticle.hidden
+                              ? 'Hidden'
+                              : 'Visible'}
+                        </span>
+                        {!selectedArticle.hidden && selectedArticle.status !== 'deleted' && (
+                          <button type="button" className="primaryButton compactButton" onClick={() => handleModerationAction(selectedArticle.id, 'hide')} disabled={isBusy}>
+                            Hide
+                          </button>
+                        )}
+                        {selectedArticle.hidden && selectedArticle.status !== 'deleted' && (
+                          <button type="button" className="secondaryButton compactButton" onClick={() => handleModerationAction(selectedArticle.id, 'unhide')} disabled={isBusy}>
+                            Unhide
+                          </button>
+                        )}
+                        {selectedArticle.status !== 'deleted' && (
+                          <button type="button" className="ghostButton compactButton" onClick={() => handleModerationAction(selectedArticle.id, 'remove')} disabled={isBusy}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {selectedArticle.author_id === currentUser?.id && (
+                      <button type="button" className="secondaryButton" onClick={() => startEditingArticle(selectedArticle)}>
+                        Edit Article
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div className="metaCluster">

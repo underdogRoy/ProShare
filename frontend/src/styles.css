@@ -108,6 +108,7 @@ body::after {
 .profileEditor,
 .articleCard,
 .moderationCard,
+.adminArticleDirectory,
 .articleDetail,
 .sidePanel,
 .commentsPanel,
@@ -498,6 +499,67 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   justify-content: flex-end;
 }
 
+.adminArticleDirectory {
+  display: grid;
+  gap: 1rem;
+}
+
+.adminArticleDirectoryHeader,
+.adminPagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.adminArticleList {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.adminArticleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(31, 53, 81, 0.08);
+}
+
+.adminArticleMain {
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.adminArticleTitle {
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #1f3551;
+  font-weight: 700;
+  font-size: 1rem;
+  justify-self: start;
+  text-align: left;
+}
+
+.adminArticleTitle:hover {
+  transform: none;
+  color: #a25a38;
+}
+
+.adminArticleMeta,
+.adminArticleActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .refreshButton {
   width: auto;
   min-width: 0;
@@ -814,6 +876,23 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 }
 
 .articleDetailHeader { justify-content: space-between; }
+.articleHeaderActions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.adminHeaderControls {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.adminHeaderStatus {
+  margin-right: 0.1rem;
+}
 .articleDetail h2 {
   font-family: "Segoe UI Variable", "Aptos", "Trebuchet MS", sans-serif;
   font-size: clamp(1.5rem, 2.8vw, 2rem);
@@ -978,6 +1057,8 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .userSummary { text-align: left; }
   .profileTagEditor { grid-template-columns: 1fr; }
   .profileHeaderToolbar { justify-content: flex-start; }
+  .adminArticleRow { grid-template-columns: 1fr; }
+  .adminArticleActions { justify-content: flex-start; }
   .authPanelHeader {
     align-items: flex-start;
   }
@@ -1008,6 +1089,8 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   .commentComposer,
   .editorActions,
   .articleDetailHeader { flex-direction: column; align-items: stretch; }
+  .articleHeaderActions,
+  .adminHeaderControls { justify-content: flex-start; }
   .cardActions { margin-left: 0; }
   .portfolioHeader h2 { white-space: normal; }
   .toastNotice {

@@ -241,6 +241,14 @@ async def admin_reports(request: Request):
     return enriched
 
 
+@app.api_route('/admin/articles', methods=['GET'])
+async def admin_articles(request: Request):
+    payload = await request_json('GET', f"{CONTENT}/admin/articles", request=request)
+    items = payload.get("items", [])
+    payload["items"] = await attach_author_usernames(items)
+    return payload
+
+
 @app.api_route('/admin/articles/{article_id}/{action}', methods=['POST'])
 async def admin_article_action(article_id: int, action: str, request: Request):
     return await request_json('POST', f"{CONTENT}/admin/articles/{article_id}/{action}", request=request)
