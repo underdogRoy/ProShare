@@ -224,6 +224,7 @@ function App() {
   const [comments, setComments] = useState([])
   const [commentDraft, setCommentDraft] = useState('')
   const [reportReason, setReportReason] = useState('')
+  const [showReportComposer, setShowReportComposer] = useState(false)
   const [moderationReports, setModerationReports] = useState([])
   const [moderationFilter, setModerationFilter] = useState('open')
   const [summary, setSummary] = useState(null)
@@ -418,6 +419,7 @@ function App() {
     setArticleStats(stats)
     setCommentDraft('')
     setReportReason('')
+    setShowReportComposer(false)
     setSummary(null)
     setFeedbackMessage('')
     setArticleReturnTo(returnTo)
@@ -783,6 +785,7 @@ function App() {
         reason: reportReason.trim(),
       })
       setReportReason('')
+      setShowReportComposer(false)
       setNotice({ type: 'success', text: 'Report submitted for moderator review.' })
     } catch (error) {
       setNotice({ type: 'error', text: error.message })
@@ -1702,6 +1705,52 @@ function App() {
                 <div className="articleBody ql-snow">
                   <div className="ql-editor" dangerouslySetInnerHTML={{ __html: selectedArticle.content }} />
                 </div>
+
+                <section className="reportInlinePanel">
+                  <div className="reportInlineHeader">
+                    <div>
+                      <p className="eyebrow">Safety</p>
+                      <h4>Report this article</h4>
+                    </div>
+                    {!showReportComposer ? (
+                      <button
+                        type="button"
+                        className="ghostButton compactButton"
+                        onClick={() => setShowReportComposer(true)}
+                      >
+                        Report Article
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghostButton compactButton"
+                        onClick={() => {
+                          setShowReportComposer(false)
+                          setReportReason('')
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                  </div>
+                  <p className="subtleMessage">Flag content that needs moderator attention and include a short reason.</p>
+                  {showReportComposer && (
+                    <form className="reportInlineForm" onSubmit={handleReportArticle}>
+                      <label>
+                        <span>Reason</span>
+                        <textarea
+                          rows={4}
+                          value={reportReason}
+                          onChange={(event) => setReportReason(event.target.value)}
+                          placeholder="Explain what should be reviewed"
+                        />
+                      </label>
+                      <div className="reportInlineActions">
+                        <button type="submit" className="primaryButton compactButton" disabled={isBusy}>Submit Report</button>
+                      </div>
+                    </form>
+                  )}
+                </section>
               </article>
 
               <section className="pageSurface sidePanel">
@@ -1715,24 +1764,6 @@ function App() {
                   <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
                   <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
                 </div>
-              </section>
-
-              <section className="pageSurface sidePanel">
-                <p className="eyebrow">Safety</p>
-                <h3>Report this article</h3>
-                <p>Flag content that needs moderator attention and include a short reason.</p>
-                <form className="authForm" onSubmit={handleReportArticle}>
-                  <label>
-                    <span>Reason</span>
-                    <textarea
-                      rows={4}
-                      value={reportReason}
-                      onChange={(event) => setReportReason(event.target.value)}
-                      placeholder="Explain what should be reviewed"
-                    />
-                  </label>
-                  <button type="submit" className="ghostButton" disabled={isBusy}>Submit Report</button>
-                </form>
               </section>
 
               <section className="pageSurface commentsPanel">

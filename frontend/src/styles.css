@@ -835,6 +835,28 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .articleBody .ql-editor p {
   margin-bottom: 1em;
 }
+.reportInlinePanel {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 0.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(31, 53, 81, 0.09);
+}
+.reportInlineHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.reportInlineForm {
+  display: grid;
+  gap: 0.85rem;
+}
+.reportInlineActions {
+  display: flex;
+  justify-content: flex-start;
+}
 .stackedActions { flex-direction: column; align-items: stretch; }
 .stackedActions > * { width: 100%; }
 
