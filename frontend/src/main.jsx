@@ -844,7 +844,7 @@ function App() {
               <div>
                 <p className="eyebrow">Read Across The Community</p>
                 <h2>Published articles from every user</h2>
-                <p>Browse the latest writing, search by topic, and open any article for comments, engagement, and AI summaries.</p>
+                <p>Browse the latest writing and search by topic.</p>
               </div>
               <form className="toolbar" onSubmit={(e) => { e.preventDefault(); setShowSuggestions(false); refreshExplore() }} style={{ position: 'relative', flexWrap: 'nowrap' }}>
                 <input
@@ -1208,7 +1208,7 @@ function App() {
         {!isBootstrapping && page === 'article' && selectedArticle && (
           <>
             <ReadingProgress />
-            <section className="articleLayout" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+            <section className="articleLayout">
               <article className="pageSurface articleDetail">
                 <div className="articleDetailHeader">
                   <button
@@ -1249,42 +1249,45 @@ function App() {
                 </div>
               </article>
 
-              <section className="pageSurface sidePanel" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '1rem' }}>
-                <p className="eyebrow" style={{ width: '100%', margin: 0 }}>Engagement</p>
-                <div className="statGrid slimStats" style={{ flex: '1 1 auto' }}>
+              <aside className="articleSidebar">
+                <section className="pageSurface sidePanel">
+                  <p className="eyebrow">AI Summary</p>
+                  <h3>Summarize this article</h3>
+                  <p>Generate a quick TL;DR and takeaways without leaving the reading page.</p>
+                  <div className="stackedActions">
+                    <button type="button" className="primaryButton" onClick={() => handleSummary(false)}>Generate Summary</button>
+                    <button type="button" className="ghostButton" onClick={() => handleSummary(true)}>Regenerate</button>
+                  </div>
+                  {summary && (
+                    <div className="summaryPanel">
+                      <h4>TL;DR</h4>
+                      <p>{summary.tldr}</p>
+                      <ul>{summary.takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
+                      <div className="feedbackRow">
+                        <button type="button" className="secondaryButton compactButton" onClick={() => handleSummaryFeedback(true)}>Helpful</button>
+                        <button type="button" className="ghostButton compactButton" onClick={() => handleSummaryFeedback(false)}>Not Helpful</button>
+                      </div>
+                      {feedbackMessage && <p className="subtleMessage">{feedbackMessage}</p>}
+                    </div>
+                  )}
+                </section>
+
+              </aside>
+
+              <section className="pageSurface sidePanel" style={{ gridColumn: '1 / -1' }}>
+                <p className="eyebrow">Engagement</p>
+                <div className="statGrid slimStats">
                   <div className="statCard"><strong>{articleStats?.like_count ?? 0}</strong><span>Likes</span></div>
                   <div className="statCard"><strong>{articleStats?.comment_count ?? 0}</strong><span>Comments</span></div>
                   <div className="statCard"><strong>{articleStats?.bookmarked ? 'Yes' : 'No'}</strong><span>Bookmarked</span></div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                   <button type="button" className="primaryButton" onClick={() => handleEngagement('like')}>Like Article</button>
                   <button type="button" className="ghostButton" onClick={() => handleEngagement('bookmark')}>Bookmark Article</button>
                 </div>
               </section>
 
-              <section className="pageSurface sidePanel">
-                <p className="eyebrow">AI Summary</p>
-                <h3>Summarize this article</h3>
-                <p>Generate a quick TL;DR and takeaways without leaving the reading page.</p>
-                <div className="stackedActions">
-                  <button type="button" className="primaryButton" onClick={() => handleSummary(false)}>Generate Summary</button>
-                  <button type="button" className="ghostButton" onClick={() => handleSummary(true)}>Regenerate</button>
-                </div>
-                {summary && (
-                  <div className="summaryPanel">
-                    <h4>TL;DR</h4>
-                    <p>{summary.tldr}</p>
-                    <ul>{summary.takeaways.map((item) => <li key={item}>{item}</li>)}</ul>
-                    <div className="feedbackRow">
-                      <button type="button" className="secondaryButton compactButton" onClick={() => handleSummaryFeedback(true)}>Helpful</button>
-                      <button type="button" className="ghostButton compactButton" onClick={() => handleSummaryFeedback(false)}>Not Helpful</button>
-                    </div>
-                    {feedbackMessage && <p className="subtleMessage">{feedbackMessage}</p>}
-                  </div>
-                )}
-              </section>
-
-              <section className="pageSurface sidePanel">
+              <section className="pageSurface sidePanel" style={{ gridColumn: '1 / -1' }}>
                 <p className="eyebrow">Safety</p>
                 <h3>Report this article</h3>
                 <p>Flag content that needs moderator attention and include a short reason.</p>
@@ -1302,7 +1305,7 @@ function App() {
                 </form>
               </section>
 
-              <section className="pageSurface commentsPanel" style={{ gridColumn: 'auto' }}>
+              <section className="pageSurface commentsPanel">
                 <div className="panelHeader">
                   <div>
                     <p className="eyebrow">Discussion</p>

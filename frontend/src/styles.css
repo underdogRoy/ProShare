@@ -354,7 +354,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .pageHeader {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(400px, 1fr);
   align-items: end;
 }
 
@@ -519,7 +519,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   background: rgba(84, 151, 96, 0.15);
 }
 
-.articleCard h3 { min-height: 3rem; }
+.articleCard h3 { min-height: 0; }
 .articleAuthor {
   font-size: 0.85rem;
   font-weight: 600;
@@ -681,6 +681,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   font-size: clamp(1.5rem, 2.8vw, 2rem);
   font-weight: 700;
   line-height: 1.25;
+  margin: 0;
 }
 .metaCluster { gap: 0.6rem; }
 .articleBody p {
@@ -699,8 +700,7 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
 .articleSidebar {
   display: grid;
   gap: 1rem;
-  position: sticky;
-  top: 1rem;
+  align-self: start;
 }
 .stackedActions { flex-direction: column; align-items: stretch; }
 .stackedActions > * { width: 100%; }
