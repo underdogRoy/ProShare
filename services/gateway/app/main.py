@@ -146,7 +146,7 @@ async def article_stats(article_id: int, request: Request):
     return await request_json(request.method, f"{ENGAGEMENT}/articles/{article_id}/stats", request=request)
 
 
-@app.api_route('/articles/{path:path}', methods=['GET', 'POST', 'PUT'])
+@app.api_route('/articles/{path:path}', methods=['GET', 'POST', 'PUT', 'DELETE'])
 async def articles_proxy(path: str, request: Request):
     return await request_json(request.method, f"{CONTENT}/articles/{path}", request=request)
 

@@ -504,6 +504,16 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   white-space: nowrap;
 }
 
+.filterBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mineRefreshButton {
+  margin-left: auto;
+}
+
 .reportStatusBlock {
   margin-left: auto;
   justify-content: flex-end;
@@ -538,6 +548,15 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   align-items: center;
   gap: 0.25rem;
 }
+.deleteButton {
+  color: #7c2614;
+  background: rgba(198, 93, 60, 0.1);
+  border: 1px solid rgba(198, 93, 60, 0.25);
+}
+.deleteButton:hover {
+  background: rgba(198, 93, 60, 0.18);
+}
+
 .articleCardFooter { justify-content: space-between; }
 .cardActions { margin-left: auto; }
 
