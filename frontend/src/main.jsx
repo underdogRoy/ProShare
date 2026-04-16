@@ -114,7 +114,7 @@ function EmptyState({ title, text, actionLabel, onAction }) {
   )
 }
 
-function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
+function ArticleCard({ article, onOpen, onEdit, onDelete, showEdit, authorName }) {
   return (
     <article className="pageSurface articleCard" onClick={() => onOpen(article.id)}>
       <div className="articleCardTop">
@@ -140,16 +140,22 @@ function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
         <span className="metaText">{formatDate(article.updated_at || article.created_at)}</span>
         <div className="cardActions">
           {showEdit && (
-            <button
-              type="button"
-              className="ghostButton compactButton"
-              onClick={(event) => {
-                event.stopPropagation()
-                onEdit(article)
-              }}
-            >
-              Edit
-            </button>
+            <>
+              <button
+                type="button"
+                className="ghostButton compactButton"
+                onClick={(event) => { event.stopPropagation(); onEdit(article) }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="deleteButton compactButton"
+                onClick={(event) => { event.stopPropagation(); onDelete(article) }}
+              >
+                Delete
+              </button>
+            </>
           )}
           <button type="button" className="secondaryButton compactButton">Open</button>
         </div>
@@ -404,6 +410,20 @@ function App() {
     setEditor(normalizeEditor(article))
     setEditorMode('edit')
     setPage('editor')
+  }
+
+  async function handleDeleteArticle(article) {
+    if (!window.confirm(`Delete "${article.title}"? This cannot be undone.`)) return
+    setIsBusy(true)
+    try {
+      await api(`/articles/${article.id}`, 'DELETE', token)
+      await loadMine()
+      setNotice({ type: 'success', text: 'Article deleted.' })
+    } catch (error) {
+      setNotice({ type: 'error', text: error.message })
+    } finally {
+      setIsBusy(false)
+    }
   }
 
   function logout() {
@@ -1129,7 +1149,7 @@ function App() {
               <div>
                 <p className="eyebrow">Your Writing Desk</p>
                 <h2>Manage articles you have written</h2>
-                <p>Review drafts, polish published posts, and jump into editing whenever you need to refine something.</p>
+                <p>Review drafts and polish published posts</p>
               </div>
               <div className="statGrid">
                 <div className="statCard"><strong>{mineArticles.length}</strong><span>Total Articles</span></div>
@@ -1145,12 +1165,12 @@ function App() {
                   </button>
                 ))}
               </div>
-              <button type="button" className="ghostButton" onClick={refreshMine}>Refresh</button>
+              <button type="button" className="ghostButton compactButton mineRefreshButton" onClick={refreshMine}>&#8635; Refresh</button>
             </section>
             {filteredMineArticles.length ? (
               <section className="articleGrid">
                 {filteredMineArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} showEdit />
+                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'mine')} onEdit={startEditingArticle} onDelete={handleDeleteArticle} showEdit />
                 ))}
               </section>
             ) : (
@@ -1237,7 +1257,7 @@ function App() {
             {mineArticles.length ? (
               <section className="articleGrid portfolioGrid">
                 {mineArticles.map((article) => (
-                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'profile')} onEdit={startEditingArticle} showEdit />
+                  <ArticleCard key={article.id} article={article} onOpen={(id) => handleOpenArticle(id, 'profile')} onEdit={startEditingArticle} onDelete={handleDeleteArticle} showEdit />
                 ))}
               </section>
             ) : (
@@ -1369,8 +1389,8 @@ function App() {
             </form>
             <aside className="pageSurface writingGuide">
               <p className="eyebrow">Editor Notes</p>
-              <h3>Use this space for writing, not browsing</h3>
-              <p>This page is intentionally separate from the reader view so creating content feels focused instead of crowded.</p>
+              <h3>Use this space for writing</h3>
+              <p>This page is intentionally separate from the reader view so creating content feels focused</p>
               <div className="statGrid slimStats">
                 <div className="statCard"><strong>{editor.title.trim() ? editor.title.trim().split(/\s+/).length : 0}</strong><span>Title Words</span></div>
                 <div className="statCard"><strong>{plainText(editor.content) ? plainText(editor.content).split(/\s+/).length : 0}</strong><span>Body Words</span></div>

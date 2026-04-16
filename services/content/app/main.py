@@ -171,6 +171,21 @@ def search(q: str = Query(""), db: Session = Depends(get_db)):
     )
 
 
+@app.delete("/articles/{article_id}")
+def delete_article(article_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
+    article = db.query(Article).filter(Article.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Not found")
+    if article.author_id != user_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if article.status == "deleted":
+        raise HTTPException(status_code=400, detail="Article already deleted")
+    article.status = "deleted"
+    article.hidden = True
+    db.commit()
+    return {"ok": True}
+
+
 @app.post("/admin/articles/{article_id}/hide")
 def hide_article(article_id: int, admin_id: int = Depends(require_admin), db: Session = Depends(get_db)):
     article = db.query(Article).filter(Article.id == article_id).first()
