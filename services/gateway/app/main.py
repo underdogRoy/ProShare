@@ -44,6 +44,25 @@ async def request_json(method: str, url: str, request: Request | None = None, js
     return resp.json() if resp.text else {"ok": True}
 
 
+async def attach_author_usernames(articles: list[dict]) -> list[dict]:
+    if not articles:
+        return articles
+
+    author_ids = sorted({article.get("author_id") for article in articles if article.get("author_id") is not None})
+    if not author_ids:
+        return articles
+
+    try:
+        users = await request_json("GET", f"{IDENTITY}/users/batch?ids={','.join(str(user_id) for user_id in author_ids)}")
+    except HTTPException:
+        return articles
+
+    usernames = {user["id"]: user["username"] for user in users if user.get("id") is not None and user.get("username")}
+    for article in articles:
+        article["author_username"] = usernames.get(article.get("author_id"))
+    return articles
+
+
 @app.get('/health')
 def health():
     return {"ok": True}
@@ -79,7 +98,8 @@ async def _fetch_user_articles(engagement_path: str, auth_header: str) -> list:
     if content_resp.status_code >= 400:
         detail = content_resp.json() if content_resp.headers.get("content-type", "").startswith("application/json") else {"detail": content_resp.text}
         raise HTTPException(status_code=content_resp.status_code, detail=detail)
-    return content_resp.json() if content_resp.text else []
+    articles = content_resp.json() if content_resp.text else []
+    return await attach_author_usernames(articles)
 
 
 @app.api_route('/me/likes', methods=['GET'])
@@ -103,7 +123,15 @@ async def create_article(request: Request):
 
 @app.api_route('/articles/mine', methods=['GET'])
 async def my_articles(request: Request):
-    return await request_json(request.method, f"{CONTENT}/articles/mine", request=request)
+    articles = await request_json(request.method, f"{CONTENT}/articles/mine", request=request)
+    return await attach_author_usernames(articles)
+
+
+@app.api_route('/articles/{article_id}', methods=['GET'])
+async def get_article(article_id: int, request: Request):
+    article = await request_json('GET', f"{CONTENT}/articles/{article_id}", request=request)
+    enriched = await attach_author_usernames([article])
+    return enriched[0] if enriched else article
 
 
 @app.api_route('/articles/{article_id}/summary', methods=['POST'])
@@ -154,6 +182,7 @@ async def articles_proxy(path: str, request: Request):
 async def _enrich_and_sort(articles: list, sort: str) -> list:
     if not articles:
         return articles
+    await attach_author_usernames(articles)
     ids = ",".join(str(a["id"]) for a in articles)
     try:
         stats_map = await request_json('GET', f"{ENGAGEMENT}/articles/batch-stats?ids={ids}")

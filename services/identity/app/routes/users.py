@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..deps import current_user, get_db
@@ -6,6 +6,19 @@ from ..models import User
 from ..schemas import ProfileIn
 
 router = APIRouter(prefix="/users", tags=["users"])
+
+
+@router.get("/batch")
+def batch_users(ids: str = Query(""), db: Session = Depends(get_db)):
+    if not ids:
+        return []
+
+    user_ids = [int(item) for item in ids.split(",") if item.strip().isdigit()]
+    if not user_ids:
+        return []
+
+    users = db.query(User).filter(User.id.in_(user_ids)).all()
+    return [{"id": user.id, "username": user.username} for user in users]
 
 
 @router.get("/me")

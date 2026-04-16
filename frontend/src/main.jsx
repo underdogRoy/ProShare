@@ -81,6 +81,12 @@ function resolutionActionLabel(action) {
   return action || 'resolved'
 }
 
+function authorLabel(article, currentUser) {
+  if (article.author_username) return `@${article.author_username}`
+  if (article.author_id === currentUser?.id) return `@${currentUser.username}`
+  return `User #${article.author_id}`
+}
+
 function ReadingProgress() {
   const [progress, setProgress] = useState(0)
 
@@ -1009,7 +1015,7 @@ function App() {
                         key={article.id}
                         article={article}
                         onOpen={(id) => handleOpenArticle(id, 'explore')}
-                        authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                        authorName={authorLabel(article, currentUser)}
                       />
                     ))}
                   </section>
@@ -1104,7 +1110,7 @@ function App() {
                     key={article.id}
                     article={article}
                     onOpen={(id) => handleOpenArticle(id, 'likes')}
-                    authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                    authorName={authorLabel(article, currentUser)}
                   />
                 ))}
               </section>
@@ -1133,7 +1139,7 @@ function App() {
                     key={article.id}
                     article={article}
                     onOpen={(id) => handleOpenArticle(id, 'bookmarks')}
-                    authorName={article.author_id === currentUser?.id ? `@${currentUser.username}` : `User #${article.author_id}`}
+                    authorName={authorLabel(article, currentUser)}
                   />
                 ))}
               </section>
@@ -1540,9 +1546,7 @@ function App() {
                   <span className="metaText">{formatDate(selectedArticle.updated_at || selectedArticle.created_at)}</span>
                   <span className="metaText">{readingTime(selectedArticle.content)}</span>
                   <span className="metaText">
-                    {selectedArticle.author_id === currentUser?.id
-                      ? `Written by @${currentUser.username}`
-                      : `Written by User #${selectedArticle.author_id}`}
+                    {`Written by ${authorLabel(selectedArticle, currentUser)}`}
                   </span>
                 </div>
 
