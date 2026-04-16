@@ -142,6 +142,41 @@ def list_comments(article_id: int, db: Session = Depends(get_db)):
     return db.query(Comment).filter(Comment.article_id == article_id).order_by(Comment.created_at).all()
 
 
+@app.get("/articles/batch-stats")
+def batch_stats(ids: str = Query(""), db: Session = Depends(get_db)):
+    if not ids:
+        return {}
+    id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
+    if not id_list:
+        return {}
+    like_counts = dict(
+        db.query(Like.article_id, func.count(Like.id))
+        .filter(Like.article_id.in_(id_list))
+        .group_by(Like.article_id)
+        .all()
+    )
+    comment_counts = dict(
+        db.query(Comment.article_id, func.count(Comment.id))
+        .filter(Comment.article_id.in_(id_list))
+        .group_by(Comment.article_id)
+        .all()
+    )
+    bookmark_counts = dict(
+        db.query(Bookmark.article_id, func.count(Bookmark.id))
+        .filter(Bookmark.article_id.in_(id_list))
+        .group_by(Bookmark.article_id)
+        .all()
+    )
+    return {
+        article_id: {
+            "like_count": like_counts.get(article_id, 0),
+            "comment_count": comment_counts.get(article_id, 0),
+            "bookmark_count": bookmark_counts.get(article_id, 0),
+        }
+        for article_id in id_list
+    }
+
+
 @app.get("/articles/{article_id}/stats")
 def stats(article_id: int, user_id: int = Depends(current_user_id), db: Session = Depends(get_db)):
     likes = db.query(func.count(Like.id)).filter(Like.article_id == article_id).scalar() or 0

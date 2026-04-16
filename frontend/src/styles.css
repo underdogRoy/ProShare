@@ -526,6 +526,18 @@ button:disabled { opacity: 0.6; cursor: wait; transform: none; }
   color: #a25a38;
 }
 .articleExcerpt { color: #4f5b68; }
+.articleStatRow {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+.articleStat {
+  font-size: 0.82rem;
+  color: #7a8694;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
 .articleCardFooter { justify-content: space-between; }
 .cardActions { margin-left: auto; }
 

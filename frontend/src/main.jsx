@@ -129,6 +129,13 @@ function ArticleCard({ article, onOpen, onEdit, showEdit, authorName }) {
           <span key={tag} className="tagChip">{tag}</span>
         ))}
       </div>
+      {(article.like_count != null || article.comment_count != null || article.bookmark_count != null) && (
+        <div className="articleStatRow">
+          <span className="articleStat" title="Likes">&#9829; {article.like_count ?? 0}</span>
+          <span className="articleStat" title="Comments">&#128172; {article.comment_count ?? 0}</span>
+          <span className="articleStat" title="Bookmarks">&#9733; {article.bookmark_count ?? 0}</span>
+        </div>
+      )}
       <div className="articleCardFooter">
         <span className="metaText">{formatDate(article.updated_at || article.created_at)}</span>
         <div className="cardActions">
@@ -170,6 +177,7 @@ function App() {
   const [isBusy, setIsBusy] = useState(false)
   const [exploreArticles, setExploreArticles] = useState([])
   const [exploreQuery, setExploreQuery] = useState('')
+  const [exploreSort, setExploreSort] = useState('time')
   const [mineArticles, setMineArticles] = useState([])
   const [mineFilter, setMineFilter] = useState('all')
   const [selectedArticle, setSelectedArticle] = useState(null)
@@ -291,9 +299,12 @@ function App() {
     }
   }, [token])
 
-  async function loadExplore(query = exploreQuery) {
+  async function loadExplore(query = exploreQuery, sort = exploreSort) {
     const cleaned = query.trim()
-    const path = cleaned ? `/search?q=${encodeURIComponent(cleaned)}` : '/feeds/recent'
+    const sortParam = `sort=${encodeURIComponent(sort)}`
+    const path = cleaned
+      ? `/search?q=${encodeURIComponent(cleaned)}&${sortParam}`
+      : `/feeds/recent?${sortParam}`
     const data = await api(path, 'GET', token)
     setExploreArticles(data)
     return data
@@ -349,6 +360,7 @@ function App() {
     setEditor({ ...EMPTY_EDITOR })
     setEditorMode('create')
     setExploreArticles([])
+    setExploreSort('time')
     setMineArticles([])
     setSelectedArticle(null)
     setSummary(null)
@@ -871,7 +883,7 @@ function App() {
                   placeholder="Search by title, content, or tags"
                 />
                 <button type="submit" className="primaryButton" disabled={isBusy}>Search</button>
-                <button type="button" className="ghostButton" onClick={() => { setExploreQuery(''); setSuggestions([]); setShowSuggestions(false); loadExplore('') }}>Show Latest</button>
+                <button type="button" className="ghostButton" onClick={() => { setExploreQuery(''); setSuggestions([]); setShowSuggestions(false); setExploreSort('time'); loadExplore('', 'time') }}>Show Latest</button>
                 {showSuggestions && exploreQuery.trim() && (
                   <ul style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#ffffff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 8, margin: 0, padding: 0, listStyle: 'none', zIndex: 50, maxHeight: 240, overflowY: 'auto', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
                     {suggestions.length ? suggestions.map((item) => (
@@ -884,6 +896,24 @@ function App() {
                   </ul>
                 )}
               </form>
+            </section>
+            <section className="pageSurface filterBar">
+              <div className="modeSwitch">
+                {[
+                  { value: 'time', label: 'Latest' },
+                  { value: 'likes', label: '&#9829; Most Liked' },
+                  { value: 'comments', label: '&#128172; Most Commented' },
+                  { value: 'bookmarks', label: '&#9733; Most Bookmarked' },
+                ].map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`modeButton ${exploreSort === value ? 'active' : ''}`}
+                    dangerouslySetInnerHTML={{ __html: label }}
+                    onClick={() => { setExploreSort(value); loadExplore(exploreQuery, value) }}
+                  />
+                ))}
+              </div>
             </section>
             {exploreArticles.length ? (
               <section className="articleGrid singleColumn">
