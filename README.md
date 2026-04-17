@@ -4,7 +4,7 @@ A professional article-sharing platform built on a microservices architecture. U
 
 ## Architecture
 
-Four core backend microservices sit behind a unified API gateway:
+Five core backend microservices sit behind a unified API gateway:
 
 | Service | Responsibility |
 |---|---|
