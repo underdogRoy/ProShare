@@ -38,7 +38,7 @@ async def request_json(method: str, url: str, request: Request | None = None, js
     params = None
     body = None
     if request is not None:
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in {"host", "content-length"}}
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in {"host", "content-length", "accept-encoding"}}
         params = request.query_params
         if json_body is None:
             body = await request.body()
