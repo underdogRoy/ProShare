@@ -1,5 +1,9 @@
 # ProShare
 
+**Live demo: [https://proshare-frontend.onrender.com](https://proshare-frontend.onrender.com)**
+
+> Hosted on Render's free tier — services spin down after 15 minutes of inactivity, so the first request may take ~30 seconds to wake up.
+
 A professional article-sharing platform built on a microservices architecture. Users can write, publish, and explore articles, engage with the community through likes, bookmarks and comments, and generate AI-powered summaries using the Claude API.
 
 ## Architecture

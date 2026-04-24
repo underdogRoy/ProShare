@@ -4,7 +4,8 @@ import ReactQuill from 'react-quill'
 import 'react-quill/dist/quill.snow.css'
 import './styles.css'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const _rawApi = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = _rawApi.startsWith('http') ? _rawApi : `https://${_rawApi}`
 const EMPTY_EDITOR = { id: null, title: '', content: '', tags: '', status: 'published' }
 const EMPTY_CREDENTIALS = { email: '', username: '', password: '' }
 const EMPTY_RESET = { token: '', newPassword: '', confirmPassword: '' }
