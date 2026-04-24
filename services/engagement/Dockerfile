@@ -3,4 +3,4 @@ WORKDIR /app
 COPY services /app/services
 RUN pip install --no-cache-dir -r /app/services/engagement/requirements.txt
 ENV PYTHONPATH=/app
-CMD ["uvicorn", "services.engagement.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn services.engagement.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

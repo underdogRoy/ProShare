@@ -4,11 +4,18 @@ import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-IDENTITY = os.getenv("IDENTITY_URL", "http://localhost:8001")
-CONTENT = os.getenv("CONTENT_URL", "http://localhost:8002")
-ENGAGEMENT = os.getenv("ENGAGEMENT_URL", "http://localhost:8003")
-SUMMARY = os.getenv("SUMMARY_URL", "http://localhost:8004")
-NOTIFICATIONS = os.getenv("NOTIFICATIONS_URL", "http://localhost:8005")
+def _with_scheme(url: str) -> str:
+    """Add https:// to bare hostnames injected by Render's fromService.host."""
+    if url and not url.startswith(("http://", "https://")):
+        return f"https://{url}"
+    return url
+
+
+IDENTITY = _with_scheme(os.getenv("IDENTITY_URL", "http://localhost:8001"))
+CONTENT = _with_scheme(os.getenv("CONTENT_URL", "http://localhost:8002"))
+ENGAGEMENT = _with_scheme(os.getenv("ENGAGEMENT_URL", "http://localhost:8003"))
+SUMMARY = _with_scheme(os.getenv("SUMMARY_URL", "http://localhost:8004"))
+NOTIFICATIONS = _with_scheme(os.getenv("NOTIFICATIONS_URL", "http://localhost:8005"))
 CORS_ALLOW_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CORS_ALLOW_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(",")
@@ -19,7 +26,7 @@ app = FastAPI(title="ProShare API Gateway")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ALLOW_ORIGINS,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?|https://[a-z0-9-]+\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -1,0 +1,164 @@
+envVarGroups:
+  - name: proshare-shared
+    envVars:
+      - key: JWT_SECRET
+        generateValue: true
+
+databases:
+  - name: proshare-db
+    databaseName: proshare
+    user: proshare
+    plan: free
+
+services:
+  # ── Frontend (Static Site) ──────────────────────────────────────────────────
+  - type: web
+    name: proshare-frontend
+    env: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: proshare-gateway
+          property: host
+
+  # ── API Gateway ─────────────────────────────────────────────────────────────
+  - type: web
+    name: proshare-gateway
+    env: docker
+    dockerfilePath: ./services/gateway/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: IDENTITY_URL
+        fromService:
+          type: web
+          name: proshare-identity
+          property: host
+      - key: CONTENT_URL
+        fromService:
+          type: web
+          name: proshare-content
+          property: host
+      - key: ENGAGEMENT_URL
+        fromService:
+          type: web
+          name: proshare-engagement
+          property: host
+      - key: SUMMARY_URL
+        fromService:
+          type: web
+          name: proshare-summary
+          property: host
+      - key: NOTIFICATIONS_URL
+        fromService:
+          type: web
+          name: proshare-notifications
+          property: host
+
+  # ── Identity Service ────────────────────────────────────────────────────────
+  - type: web
+    name: proshare-identity
+    env: docker
+    dockerfilePath: ./services/identity/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: proshare-shared
+      - key: IDENTITY_DB_URL
+        fromDatabase:
+          name: proshare-db
+          property: connectionString
+      - key: PASSWORD_RESET_URL_BASE
+        fromService:
+          type: web
+          name: proshare-frontend
+          property: host
+      - key: IDENTITY_SHOW_RESET_LINK
+        value: "false"
+      - key: SMTP_PROVIDER
+        value: gmail
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: ProShare
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_USE_SSL
+        value: "false"
+
+  # ── Content Service ─────────────────────────────────────────────────────────
+  - type: web
+    name: proshare-content
+    env: docker
+    dockerfilePath: ./services/content/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: proshare-shared
+      - key: CONTENT_DB_URL
+        fromDatabase:
+          name: proshare-db
+          property: connectionString
+
+  # ── Engagement Service ──────────────────────────────────────────────────────
+  - type: web
+    name: proshare-engagement
+    env: docker
+    dockerfilePath: ./services/engagement/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: proshare-shared
+      - key: ENGAGEMENT_DB_URL
+        fromDatabase:
+          name: proshare-db
+          property: connectionString
+
+  # ── Summary Service ─────────────────────────────────────────────────────────
+  - type: web
+    name: proshare-summary
+    env: docker
+    dockerfilePath: ./services/summary/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: proshare-shared
+      - key: SUMMARY_DB_URL
+        fromDatabase:
+          name: proshare-db
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: REDIS_URL
+        value: "memory://"
+
+  # ── Notifications Service ───────────────────────────────────────────────────
+  - type: web
+    name: proshare-notifications
+    env: docker
+    dockerfilePath: ./services/notifications/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - fromGroup: proshare-shared
+      - key: NOTIFICATIONS_DB_URL
+        fromDatabase:
+          name: proshare-db
+          property: connectionString
