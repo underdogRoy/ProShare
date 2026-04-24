@@ -29,7 +29,7 @@ services:
       context: .
       dockerfile: services/identity/Dockerfile
     environment:
-      IDENTITY_DB_UokRL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_identity
+      IDENTITY_DB_URL: postgresql+psycopg://postgres:postgres@postgres:5432/proshare_identity
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
       PASSWORD_RESET_URL_BASE: ${PASSWORD_RESET_URL_BASE:-http://127.0.0.1:5173}
       IDENTITY_SHOW_RESET_LINK: ${IDENTITY_SHOW_RESET_LINK:-false}
